@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "skills": {
+    "clone-website": {
+      "source": "JCodesMore/ai-website-cloner-template",
+      "sourceType": "github",
+      "skillPath": ".claude/skills/clone-website/SKILL.md",
+      "computedHash": "f8bb3724afae412770cd73b377d0e83672d1c00619789c03ac09d8213c9cd24a"
+    },
+    "upstash": {
+      "source": "upstash/skills",
+      "sourceType": "github",
+      "skillPath": "skills/upstash/SKILL.md",
+      "computedHash": "17f79bb120b105e34aa18cfcafa69097b59f81212079c8f83795be67032e0faf"
+    },
+    "web-shader-extractor": {
+      "source": "lixiaolin94/skills",
+      "sourceType": "github",
+      "skillPath": "web-shader-extractor/SKILL.md",
+      "computedHash": "ae6c0f3545a89f8748c4fba3c3527713397882525042055b25cb939bd4a728a4"
+    }
+  }
+}

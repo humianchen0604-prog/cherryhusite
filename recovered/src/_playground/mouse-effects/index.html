@@ -1,0 +1,529 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MouseEffects Playground</title>
+<style>
+  :root {
+    --bg: #07070b;
+    --panel: rgba(18, 18, 26, 0.82);
+    --line: rgba(255, 255, 255, 0.08);
+    --text: #ececf1;
+    --muted: #8b8b99;
+    --accent: #ff9a3c;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: var(--bg); color: var(--text);
+    font: 13px/1.4 ui-sans-serif, -apple-system, "SF Pro Text", system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+  canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+  #stage { cursor: crosshair; }
+  .hint { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); text-align: center;
+    color: var(--muted); pointer-events: none; transition: opacity .6s ease-out; }
+  .hint h1 { font-size: 28px; font-weight: 600; letter-spacing: -0.02em; color: var(--text); margin: 0 0 6px; text-wrap: balance; }
+  .panel { position: fixed; top: 16px; left: 16px; width: 260px; max-height: calc(100% - 32px); overflow: auto;
+    background: var(--panel); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+    border: 1px solid var(--line); border-radius: 14px; padding: 14px; z-index: 2; }
+  .panel h2 { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin: 0 0 8px; }
+  .fx { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; margin-bottom: 14px; }
+  .fx button { appearance: none; border: 1px solid var(--line); background: transparent; color: var(--text);
+    padding: 7px 8px; border-radius: 8px; text-align: left; font: inherit; cursor: pointer;
+    transition: background-color .15s ease-out, border-color .15s ease-out, transform .1s ease-out; }
+  .fx button:hover { background: rgba(255,255,255,0.05); }
+  .fx button:active { transform: scale(0.97); }
+  .fx button[aria-pressed="true"] { border-color: var(--accent); background: rgba(255,154,60,0.12); }
+  .fx button small { display: block; color: var(--muted); font-size: 10.5px; }
+  .ctrl { margin-bottom: 10px; }
+  .ctrl label { display: flex; justify-content: space-between; color: var(--muted); margin-bottom: 3px; }
+  .ctrl output { font-variant-numeric: tabular-nums; color: var(--text); }
+  .ctrl input[type=range] { width: 100%; accent-color: var(--accent); }
+  .row { display: flex; gap: 8px; align-items: center; margin-top: 6px; color: var(--muted); }
+  .row button { flex: 1; appearance: none; border: 1px solid var(--line); background: rgba(255,255,255,0.04);
+    color: var(--text); padding: 7px; border-radius: 8px; font: inherit; cursor: pointer; }
+  .fps { position: fixed; right: 16px; bottom: 16px; color: var(--muted); font-variant-numeric: tabular-nums; font-size: 11px; z-index: 2; }
+  @media (max-width: 600px) { .panel { width: calc(100% - 32px); max-height: 45%; } }
+</style>
+</head>
+<body>
+<canvas id="bg"></canvas>
+<canvas id="stage"></canvas>
+<div class="hint" id="hint"><h1>Move your mouse. Click.</h1>Pick an effect on the left</div>
+
+<aside class="panel">
+  <h2>Effect</h2>
+  <div class="fx" id="fxList"></div>
+  <h2>Settings</h2>
+  <div id="ctrls"></div>
+  <div class="row">
+    <label><input type="checkbox" id="showBg" checked> Backdrop</label>
+    <button id="clear">Clear</button>
+  </div>
+</aside>
+<div class="fps" id="fps"></div>
+
+<script>
+(() => {
+  const stage = document.getElementById('stage');
+  const bg = document.getElementById('bg');
+  const ctx = stage.getContext('2d');
+  const bctx = bg.getContext('2d');
+  let W = 0, H = 0, DPR = 1;
+
+  const mouse = { x: -999, y: -999, px: -999, py: -999, vx: 0, vy: 0, down: false, moved: false };
+  const rand = (a, b) => a + Math.random() * (b - a);
+  const TAU = Math.PI * 2;
+  const hsl = (h, s, l, a = 1) => `hsla(${h},${s}%,${l}%,${a})`;
+
+  function resize() {
+    DPR = Math.min(window.devicePixelRatio || 1, 2);
+    W = innerWidth; H = innerHeight;
+    for (const c of [stage, bg]) { c.width = W * DPR; c.height = H * DPR; }
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    bctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    drawBackdrop();
+  }
+
+  // A fake "desktop" so screen-interacting effects (ripple, black hole) have something to distort.
+  function drawBackdrop() {
+    bctx.clearRect(0, 0, W, H);
+    if (!document.getElementById('showBg').checked) return;
+    const g = bctx.createLinearGradient(0, 0, W, H);
+    g.addColorStop(0, '#141428'); g.addColorStop(1, '#0b0b12');
+    bctx.fillStyle = g; bctx.fillRect(0, 0, W, H);
+    bctx.strokeStyle = 'rgba(255,255,255,0.045)';
+    bctx.lineWidth = 1;
+    for (let x = 0; x < W; x += 40) { bctx.beginPath(); bctx.moveTo(x + .5, 0); bctx.lineTo(x + .5, H); bctx.stroke(); }
+    for (let y = 0; y < H; y += 40) { bctx.beginPath(); bctx.moveTo(0, y + .5); bctx.lineTo(W, y + .5); bctx.stroke(); }
+  }
+
+  // ---------- Effects (ported from the plugin defaults in ltrudu/MouseEffects) ----------
+  const effects = {};
+
+  effects.particleTrail = {
+    name: 'Particle Trail', tag: 'move',
+    params: { emission: [100, 10, 400, 1], lifetime: [1.5, 0.2, 4, 0.1], size: [8, 2, 24, 1], speed: [50, 0, 300, 1] },
+    init() { this.p = []; this.acc = 0; },
+    update(dt, s) {
+      if (mouse.moved) {
+        this.acc += s.emission * dt * Math.min(4, 1 + Math.hypot(mouse.vx, mouse.vy) / 400);
+        while (this.acc >= 1) {
+          this.acc--;
+          const a = Math.atan2(-mouse.vy, -mouse.vx) + rand(-0.5, 0.5) * Math.PI;
+          const sp = s.speed * rand(0.5, 1.5);
+          this.p.push({ x: mouse.x, y: mouse.y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, t: 0, life: s.lifetime * rand(.7, 1.2) });
+        }
+      }
+      for (const p of this.p) { p.t += dt; p.x += p.vx * dt; p.y += p.vy * dt; p.vx *= .98; p.vy *= .98; }
+      this.p = this.p.filter(p => p.t < p.life);
+    },
+    draw(s) {
+      ctx.globalCompositeOperation = 'lighter';
+      for (const p of this.p) {
+        const k = p.t / p.life;
+        // startColor (1,.6,.2) -> endColor (1,.2,.8)
+        const r = 255, gr = 153 - 102 * k | 0, b = 51 + 153 * k | 0;
+        const rad = s.size * (1 - k * .6);
+        const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, rad * 2);
+        g.addColorStop(0, `rgba(${r},${gr},${b},${(1 - k) * .9})`);
+        g.addColorStop(1, `rgba(${r},${gr},${b},0)`);
+        ctx.fillStyle = g; ctx.beginPath(); ctx.arc(p.x, p.y, rad * 2, 0, TAU); ctx.fill();
+      }
+    }
+  };
+
+  effects.firework = {
+    name: 'Firework', tag: 'click',
+    params: { particles: [100, 20, 300, 1], force: [300, 80, 700, 10], gravity: [150, 0, 500, 10], secondary: [1, 0, 1, 1] },
+    init() { this.p = []; this.rockets = []; this.hue = 0; this.auto = 0; },
+    burst(x, y, n, force, hue, second) {
+      for (let i = 0; i < n; i++) {
+        const a = rand(0, TAU), sp = force * Math.sqrt(Math.random()) * rand(.6, 1.1);
+        this.p.push({ x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, t: 0, life: rand(1.5, 2.5), hue: hue + rand(-20, 20),
+          size: rand(1.5, 3.5), second: second && Math.random() < .12, trail: [] });
+      }
+    },
+    click(x, y, s) {
+      this.hue = (this.hue + rand(40, 140)) % 360;
+      this.rockets.push({ x, y: H + 10, tx: x, ty: y, hue: this.hue });
+    },
+    update(dt, s) {
+      for (const r of this.rockets) {
+        r.y -= 900 * dt;
+        this.p.push({ x: r.x + rand(-2, 2), y: r.y, vx: rand(-20, 20), vy: rand(40, 90), t: 0, life: .4, hue: 40, size: 1.5, trail: [] });
+        if (r.y <= r.ty) { r.done = true; this.burst(r.x, r.ty, s.particles, s.force, r.hue, s.secondary > 0); }
+      }
+      this.rockets = this.rockets.filter(r => !r.done);
+      for (const p of this.p) {
+        p.trail.push(p.x, p.y); if (p.trail.length > 12) p.trail.splice(0, 2);
+        p.t += dt; p.vy += s.gravity * dt; p.vx *= .98; p.vy *= .98;
+        p.x += p.vx * dt; p.y += p.vy * dt;
+        if (p.second && p.t > .8) { p.second = false; p.t = p.life; this.burst(p.x, p.y, 20, 100, p.hue + 60, false); }
+      }
+      this.p = this.p.filter(p => p.t < p.life);
+    },
+    draw() {
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.lineCap = 'round';
+      for (const p of this.p) {
+        const k = 1 - p.t / p.life, flick = .6 + .4 * Math.sin(p.t * 40 + p.hue);
+        ctx.strokeStyle = hsl(p.hue, 100, 60, k * .5); ctx.lineWidth = p.size;
+        ctx.beginPath();
+        for (let i = 0; i < p.trail.length; i += 2) i ? ctx.lineTo(p.trail[i], p.trail[i + 1]) : ctx.moveTo(p.trail[i], p.trail[i + 1]);
+        ctx.lineTo(p.x, p.y); ctx.stroke();
+        ctx.fillStyle = hsl(p.hue, 100, 80, k * flick);
+        ctx.beginPath(); ctx.arc(p.x, p.y, p.size * 1.2, 0, TAU); ctx.fill();
+      }
+    }
+  };
+
+  effects.shockwave = {
+    name: 'Shockwave', tag: 'click',
+    params: { speed: [600, 100, 1500, 10], maxRadius: [500, 100, 1200, 10], thickness: [15, 2, 60, 1], onMove: [0, 0, 1, 1] },
+    init() { this.r = []; this.dist = 0; this.hue = 200; },
+    click(x, y) { this.r.push({ x, y, t: 0, life: 2, speed: null }); },
+    update(dt, s) {
+      if (s.onMove && mouse.moved) {
+        this.dist += Math.hypot(mouse.x - mouse.px, mouse.y - mouse.py);
+        if (this.dist > 100) { this.dist = 0; this.r.push({ x: mouse.x, y: mouse.y, t: 0, life: 1.5, speed: 400 }); }
+      }
+      for (const r of this.r) r.t += dt;
+      this.r = this.r.filter(r => r.t < r.life);
+    },
+    draw(s) {
+      ctx.globalCompositeOperation = 'lighter';
+      for (const r of this.r) {
+        const rad = Math.min(s.maxRadius, r.t * (r.speed || s.speed));
+        const k = Math.max(0, 1 - r.t / r.life) * (1 - rad / s.maxRadius * .6);
+        for (const [w, a] of [[s.thickness * 3, .15], [s.thickness, .45], [s.thickness * .25, 1]]) {
+          ctx.strokeStyle = `rgba(${a === 1 ? '220,240,255' : '0,128,255'},${a * k})`;
+          ctx.lineWidth = w; ctx.beginPath(); ctx.arc(r.x, r.y, rad, 0, TAU); ctx.stroke();
+        }
+      }
+    }
+  };
+
+  effects.fireflies = {
+    name: 'Fireflies', tag: 'ambient',
+    params: { count: [60, 10, 200, 1], attraction: [0.6, 0, 2, 0.05], glow: [14, 4, 40, 1] },
+    init() { this.f = []; },
+    update(dt, s) {
+      while (this.f.length < s.count) this.f.push({ x: rand(0, W), y: rand(0, H), vx: 0, vy: 0, ph: rand(0, TAU), rate: rand(1, 3), seed: rand(0, 100) });
+      this.f.length = s.count;
+      const t = performance.now() / 1000;
+      for (const f of this.f) {
+        f.ph += dt * f.rate;
+        f.vx += Math.cos(t * .7 + f.seed) * 30 * dt; f.vy += Math.sin(t * .9 + f.seed * 1.3) * 30 * dt;
+        if (mouse.x > -900) {
+          const dx = mouse.x - f.x, dy = mouse.y - f.y, d = Math.hypot(dx, dy) + 1;
+          const pull = s.attraction * (d > 60 ? 60 : -60);
+          f.vx += dx / d * pull * dt; f.vy += dy / d * pull * dt;
+        }
+        f.vx *= .97; f.vy *= .97; f.x += f.vx * dt * 3; f.y += f.vy * dt * 3;
+      }
+    },
+    draw(s) {
+      ctx.globalCompositeOperation = 'lighter';
+      for (const f of this.f) {
+        const pulse = Math.pow(Math.max(0, Math.sin(f.ph)), 3);
+        const g = ctx.createRadialGradient(f.x, f.y, 0, f.x, f.y, s.glow);
+        g.addColorStop(0, `rgba(230,255,140,${.15 + .85 * pulse})`);
+        g.addColorStop(.3, `rgba(170,255,60,${.4 * pulse})`);
+        g.addColorStop(1, 'rgba(120,255,0,0)');
+        ctx.fillStyle = g; ctx.beginPath(); ctx.arc(f.x, f.y, s.glow, 0, TAU); ctx.fill();
+      }
+    }
+  };
+
+  effects.fireTrail = {
+    name: 'Fire Trail', tag: 'move',
+    params: { intensity: [120, 20, 400, 1], size: [16, 4, 40, 1], embers: [1, 0, 1, 1] },
+    init() { this.p = []; this.acc = 0; },
+    update(dt, s) {
+      if (mouse.moved) {
+        const steps = Math.max(1, Math.hypot(mouse.x - mouse.px, mouse.y - mouse.py) / 4);
+        this.acc += s.intensity * dt * 1.5;
+        while (this.acc >= 1) {
+          this.acc--;
+          const k = Math.random();
+          const x = mouse.px + (mouse.x - mouse.px) * k, y = mouse.py + (mouse.y - mouse.py) * k;
+          const ember = s.embers && Math.random() < .08;
+          this.p.push({ x: x + rand(-4, 4), y: y + rand(-4, 4), vx: rand(-20, 20), vy: rand(-60, -20) * (ember ? 3 : 1),
+            t: 0, life: ember ? rand(1, 2) : rand(.4, .9), ember, sz: s.size * rand(.6, 1.2) });
+        }
+      }
+      for (const p of this.p) { p.t += dt; p.x += p.vx * dt; p.y += p.vy * dt; p.vy -= 80 * dt; p.vx += rand(-60, 60) * dt; }
+      this.p = this.p.filter(p => p.t < p.life);
+    },
+    draw() {
+      ctx.globalCompositeOperation = 'lighter';
+      for (const p of this.p) {
+        const k = p.t / p.life;
+        if (p.ember) {
+          ctx.fillStyle = `rgba(255,${180 - 100 * k | 0},60,${1 - k})`;
+          ctx.fillRect(p.x, p.y, 2, 2); continue;
+        }
+        const rad = p.sz * (1 - k * .5);
+        const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, rad);
+        g.addColorStop(0, `rgba(255,${230 - 180 * k | 0},${120 - 120 * k | 0},${(1 - k) * .55})`);
+        g.addColorStop(.5, `rgba(255,${90 - 60 * k | 0},0,${(1 - k) * .3})`);
+        g.addColorStop(1, 'rgba(120,0,0,0)');
+        ctx.fillStyle = g; ctx.beginPath(); ctx.arc(p.x, p.y, rad, 0, TAU); ctx.fill();
+      }
+    }
+  };
+
+  effects.tesla = {
+    name: 'Tesla', tag: 'ambient',
+    params: { arcs: [5, 1, 14, 1], reach: [180, 40, 500, 5], jitter: [0.35, 0.05, 1, 0.05] },
+    init() { this.bolts = []; this.timer = 0; this.nodes = []; },
+    bolt(x1, y1, x2, y2, disp, out) {
+      if (disp < 3) { out.push(x2, y2); return; }
+      const mx = (x1 + x2) / 2 + rand(-.5, .5) * disp, my = (y1 + y2) / 2 + rand(-.5, .5) * disp;
+      this.bolt(x1, y1, mx, my, disp / 2, out); this.bolt(mx, my, x2, y2, disp / 2, out);
+    },
+    click(x, y) { this.nodes.push({ x, y }); if (this.nodes.length > 6) this.nodes.shift(); },
+    update(dt, s) {
+      this.timer -= dt;
+      if (this.timer <= 0 && mouse.x > -900) {
+        this.timer = .05; this.bolts = [];
+        for (let i = 0; i < s.arcs; i++) {
+          let tx, ty;
+          const near = this.nodes.filter(n => Math.hypot(n.x - mouse.x, n.y - mouse.y) < s.reach * 2);
+          if (near.length && i < near.length) { tx = near[i].x; ty = near[i].y; }
+          else { const a = rand(0, TAU), r = rand(.4, 1) * s.reach; tx = mouse.x + Math.cos(a) * r; ty = mouse.y + Math.sin(a) * r; }
+          const pts = [mouse.x, mouse.y];
+          this.bolt(mouse.x, mouse.y, tx, ty, Math.hypot(tx - mouse.x, ty - mouse.y) * s.jitter, pts);
+          this.bolts.push(pts);
+        }
+      }
+    },
+    draw() {
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.lineJoin = 'round';
+      for (const n of this.nodes) { ctx.fillStyle = 'rgba(150,180,255,.8)'; ctx.beginPath(); ctx.arc(n.x, n.y, 4, 0, TAU); ctx.fill(); }
+      for (const pts of this.bolts) {
+        for (const [w, c] of [[8, 'rgba(90,120,255,.12)'], [3, 'rgba(140,170,255,.5)'], [1.2, 'rgba(240,245,255,1)']]) {
+          ctx.strokeStyle = c; ctx.lineWidth = w; ctx.beginPath(); ctx.moveTo(pts[0], pts[1]);
+          for (let i = 2; i < pts.length; i += 2) ctx.lineTo(pts[i], pts[i + 1]);
+          ctx.stroke();
+        }
+      }
+      const g = ctx.createRadialGradient(mouse.x, mouse.y, 0, mouse.x, mouse.y, 30);
+      g.addColorStop(0, 'rgba(200,220,255,.8)'); g.addColorStop(1, 'rgba(80,100,255,0)');
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(mouse.x, mouse.y, 30, 0, TAU); ctx.fill();
+    }
+  };
+
+  effects.waterRipple = {
+    name: 'Water Ripple', tag: 'screen',
+    params: { strength: [18, 2, 50, 1], speed: [260, 60, 800, 10], onMove: [1, 0, 1, 1] },
+    init() { this.r = []; this.dist = 0; },
+    click(x, y) { this.r.push({ x, y, t: 0, amp: 2 }); },
+    update(dt, s) {
+      if (s.onMove && mouse.moved) {
+        this.dist += Math.hypot(mouse.x - mouse.px, mouse.y - mouse.py);
+        if (this.dist > 40) { this.dist = 0; this.r.push({ x: mouse.x, y: mouse.y, t: 0, amp: .6 }); }
+      }
+      for (const r of this.r) r.t += dt;
+      this.r = this.r.filter(r => r.t < 2.2);
+    },
+    draw(s) {
+      // Displace horizontal slices of the backdrop around each ring, then draw a highlight.
+      ctx.globalCompositeOperation = 'source-over';
+      for (const r of this.r) {
+        const rad = r.t * s.speed, k = (1 - r.t / 2.2) * r.amp;
+        const band = 24;
+        ctx.save(); ctx.beginPath(); ctx.arc(r.x, r.y, rad + band, 0, TAU); ctx.arc(r.x, r.y, Math.max(0, rad - band), 0, TAU, true); ctx.clip();
+        ctx.drawImage(bg, 0, 0, bg.width, bg.height, Math.sin(r.t * 12) * s.strength * k * .3, Math.cos(r.t * 12) * s.strength * k * .3, W, H);
+        ctx.restore();
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.strokeStyle = `rgba(160,210,255,${.35 * k})`; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.arc(r.x, r.y, rad, 0, TAU); ctx.stroke();
+        ctx.strokeStyle = `rgba(60,120,200,${.25 * k})`; ctx.lineWidth = 6;
+        ctx.beginPath(); ctx.arc(r.x, r.y, Math.max(0, rad - 10), 0, TAU); ctx.stroke();
+        ctx.globalCompositeOperation = 'source-over';
+      }
+    }
+  };
+
+  effects.blackHole = {
+    name: 'Black Hole', tag: 'screen',
+    params: { radius: [60, 20, 200, 1], pull: [1, 0.1, 3, 0.1], particles: [300, 50, 1000, 10] },
+    init() { this.p = []; },
+    update(dt, s) {
+      while (this.p.length < s.particles) this.p.push({ x: rand(0, W), y: rand(0, H), vx: 0, vy: 0, hue: rand(180, 320) });
+      this.p.length = s.particles;
+      if (mouse.x < -900) return;
+      for (const p of this.p) {
+        const dx = mouse.x - p.x, dy = mouse.y - p.y, d = Math.hypot(dx, dy) + .01;
+        const f = s.pull * 60000 / (d * d + 2000);
+        // Inward pull + tangential swirl to form an accretion disk.
+        p.vx += (dx / d * f + -dy / d * f * .9) * dt * 10;
+        p.vy += (dy / d * f + dx / d * f * .9) * dt * 10;
+        p.vx *= .96; p.vy *= .96; p.x += p.vx * dt; p.y += p.vy * dt;
+        if (d < s.radius * .5) { const a = rand(0, TAU), r = Math.max(W, H) * .7; p.x = mouse.x + Math.cos(a) * r; p.y = mouse.y + Math.sin(a) * r; p.vx = p.vy = 0; }
+      }
+    },
+    draw(s) {
+      if (mouse.x > -900) {
+        // Gravitational lensing: magnify a ring of the backdrop around the hole.
+        ctx.save(); ctx.beginPath(); ctx.arc(mouse.x, mouse.y, s.radius * 2.4, 0, TAU); ctx.clip();
+        const z = 1.35;
+        ctx.translate(mouse.x, mouse.y); ctx.rotate(performance.now() / 4000); ctx.scale(z, z); ctx.translate(-mouse.x, -mouse.y);
+        ctx.drawImage(bg, 0, 0, bg.width, bg.height, 0, 0, W, H);
+        ctx.restore();
+      }
+      ctx.globalCompositeOperation = 'lighter';
+      for (const p of this.p) {
+        const sp = Math.min(1, Math.hypot(p.vx, p.vy) / 400);
+        ctx.strokeStyle = hsl(p.hue - sp * 150, 100, 55 + sp * 25, .25 + sp * .7); ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(p.x - p.vx * .03, p.y - p.vy * .03); ctx.stroke();
+      }
+      ctx.globalCompositeOperation = 'source-over';
+      if (mouse.x > -900) {
+        const g = ctx.createRadialGradient(mouse.x, mouse.y, s.radius * .5, mouse.x, mouse.y, s.radius * 1.3);
+        g.addColorStop(0, '#000'); g.addColorStop(.6, 'rgba(0,0,0,.85)'); g.addColorStop(.8, 'rgba(255,140,40,.35)'); g.addColorStop(1, 'rgba(255,140,40,0)');
+        ctx.fillStyle = g; ctx.beginPath(); ctx.arc(mouse.x, mouse.y, s.radius * 1.3, 0, TAU); ctx.fill();
+      }
+    }
+  };
+
+  effects.cherryBlossoms = {
+    name: 'Cherry Blossoms', tag: 'ambient',
+    params: { count: [120, 20, 400, 1], wind: [30, -150, 150, 5], repel: [1, 0, 1, 1] },
+    init() { this.p = []; },
+    update(dt, s) {
+      while (this.p.length < s.count) this.p.push({ x: rand(-50, W + 50), y: rand(-H, 0), rot: rand(0, TAU), spin: rand(-2, 2),
+        flip: rand(0, TAU), fs: rand(1, 3), sz: rand(6, 11), fall: rand(30, 70), sway: rand(0, TAU), light: rand(80, 92) });
+      this.p.length = s.count;
+      for (const p of this.p) {
+        p.sway += dt; p.rot += p.spin * dt; p.flip += p.fs * dt;
+        p.x += (s.wind + Math.sin(p.sway) * 25) * dt; p.y += p.fall * dt;
+        if (s.repel && mouse.x > -900) {
+          const dx = p.x - mouse.x, dy = p.y - mouse.y, d = Math.hypot(dx, dy);
+          if (d < 120) { const f = (120 - d) / 120; p.x += dx / d * f * 200 * dt + mouse.vx * f * dt * .3; p.y += dy / d * f * 200 * dt + mouse.vy * f * dt * .3; }
+        }
+        if (p.y > H + 20) { p.y = -20; p.x = rand(-50, W + 50); }
+        if (p.x > W + 60) p.x = -50; if (p.x < -60) p.x = W + 50;
+      }
+    },
+    draw() {
+      ctx.globalCompositeOperation = 'source-over';
+      for (const p of this.p) {
+        ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.rot); ctx.scale(1, Math.abs(Math.cos(p.flip)) * .8 + .2);
+        ctx.fillStyle = hsl(340, 80, p.light, .9);
+        ctx.beginPath(); ctx.moveTo(0, -p.sz);
+        ctx.bezierCurveTo(p.sz, -p.sz * .6, p.sz * .8, p.sz * .6, 0, p.sz);
+        ctx.bezierCurveTo(-p.sz * .8, p.sz * .6, -p.sz, -p.sz * .6, 0, -p.sz);
+        ctx.fill();
+        ctx.fillStyle = hsl(335, 70, 70, .6); ctx.beginPath(); ctx.arc(0, p.sz * .5, p.sz * .18, 0, TAU); ctx.fill();
+        ctx.restore();
+      }
+    }
+  };
+
+  effects.neonGlow = {
+    name: 'Neon Glow', tag: 'move',
+    params: { length: [40, 5, 120, 1], width: [6, 1, 20, 1], hueSpeed: [60, 0, 300, 5] },
+    init() { this.pts = []; this.hue = 0; },
+    update(dt, s) {
+      this.hue = (this.hue + s.hueSpeed * dt) % 360;
+      if (mouse.x > -900) this.pts.push(mouse.x, mouse.y);
+      while (this.pts.length > s.length * 2) this.pts.splice(0, 2);
+      if (!mouse.moved && this.pts.length > 4) this.pts.splice(0, 2);
+    },
+    draw(s) {
+      ctx.globalCompositeOperation = 'lighter'; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+      const n = this.pts.length / 2;
+      for (let i = 1; i < n; i++) {
+        const k = i / n, h = (this.hue + i * 4) % 360;
+        const x0 = this.pts[i * 2 - 2], y0 = this.pts[i * 2 - 1], x1 = this.pts[i * 2], y1 = this.pts[i * 2 + 1];
+        for (const [m, a, l] of [[4, .08, 50], [2, .25, 55], [.6, .9, 85]]) {
+          ctx.strokeStyle = hsl(h, 100, l, a * k); ctx.lineWidth = s.width * m * (.3 + .7 * k);
+          ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke();
+        }
+      }
+    }
+  };
+
+  // ---------- UI ----------
+  const state = {};
+  let current = null;
+  const fxList = document.getElementById('fxList');
+  const ctrls = document.getElementById('ctrls');
+
+  for (const [key, fx] of Object.entries(effects)) {
+    state[key] = Object.fromEntries(Object.entries(fx.params).map(([k, v]) => [k, v[0]]));
+    const b = document.createElement('button');
+    b.innerHTML = `${fx.name}<small>${fx.tag}</small>`;
+    b.onclick = () => select(key);
+    b.dataset.key = key;
+    fxList.appendChild(b);
+  }
+
+  function select(key) {
+    current = key;
+    effects[key].init();
+    for (const b of fxList.children) b.setAttribute('aria-pressed', b.dataset.key === key);
+    ctrls.innerHTML = '';
+    for (const [p, [, min, max, step]] of Object.entries(effects[key].params)) {
+      const toggle = min === 0 && max === 1 && step === 1;
+      const d = document.createElement('div'); d.className = 'ctrl';
+      const id = `c_${p}`;
+      d.innerHTML = toggle
+        ? `<label for="${id}"><span>${p}</span><input type="checkbox" id="${id}" ${state[key][p] ? 'checked' : ''}></label>`
+        : `<label for="${id}"><span>${p}</span><output>${state[key][p]}</output></label><input type="range" id="${id}" min="${min}" max="${max}" step="${step}" value="${state[key][p]}">`;
+      const input = d.querySelector('input');
+      input.oninput = () => {
+        state[key][p] = toggle ? (input.checked ? 1 : 0) : +input.value;
+        if (!toggle) d.querySelector('output').textContent = input.value;
+      };
+      ctrls.appendChild(d);
+    }
+    try { localStorage.setItem('me-fx', key); } catch {}
+  }
+
+  document.getElementById('clear').onclick = () => effects[current].init();
+  document.getElementById('showBg').onchange = drawBackdrop;
+
+  const hint = document.getElementById('hint');
+  stage.addEventListener('pointermove', e => {
+    mouse.x = e.clientX; mouse.y = e.clientY; hint.style.opacity = 0;
+  });
+  stage.addEventListener('pointerleave', () => { mouse.x = mouse.y = -999; });
+  stage.addEventListener('pointerdown', e => {
+    mouse.x = e.clientX; mouse.y = e.clientY; hint.style.opacity = 0;
+    const fx = effects[current];
+    if (fx.click) fx.click(e.clientX, e.clientY, state[current]);
+  });
+
+  addEventListener('resize', resize);
+  resize();
+  let saved = null; try { saved = localStorage.getItem('me-fx'); } catch {}
+  select(effects[saved] ? saved : 'particleTrail');
+
+  // ---------- Loop ----------
+  let last = performance.now(), fpsAcc = 0, fpsN = 0;
+  const fpsEl = document.getElementById('fps');
+  function frame(now) {
+    const dt = Math.min(.05, (now - last) / 1000); last = now;
+    const dx = mouse.x - mouse.px, dy = mouse.y - mouse.py;
+    mouse.moved = mouse.px > -900 && mouse.x > -900 && (dx || dy);
+    mouse.vx = mouse.moved ? dx / dt : mouse.vx * .8; mouse.vy = mouse.moved ? dy / dt : mouse.vy * .8;
+
+    const fx = effects[current], s = state[current];
+    fx.update(dt, s);
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.clearRect(0, 0, W, H);
+    fx.draw(s);
+
+    mouse.px = mouse.x; mouse.py = mouse.y;
+    fpsAcc += dt; fpsN++;
+    if (fpsAcc > .5) { fpsEl.textContent = `${Math.round(fpsN / fpsAcc)} fps`; fpsAcc = fpsN = 0; }
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

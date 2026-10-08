@@ -1,0 +1,656 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Footer Dots</title>
+<style>
+  :root {
+    --page-bg: #ffffff;
+    --band: #181818;
+    --ink: #1b1b1b;
+    --muted: #8a8a8a;
+    --panel-bg: rgba(255, 255, 255, 0.92);
+    --panel-line: rgba(0, 0, 0, 0.08);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    background: var(--page-bg);
+    color: var(--ink);
+    font-family: 'Switzer', ui-sans-serif, system-ui, -apple-system, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* Empty page above the footer, so the footer sits at the bottom. */
+  .spacer {
+    min-height: 110vh;
+    display: grid;
+    place-items: center;
+    color: var(--muted);
+    font-size: 13px;
+    letter-spacing: 0.02em;
+  }
+
+  /* --- footer (mirrors .footer_stage in globals.css) --------------------- */
+  .footer_stage {
+    --footer-pad: 40px;
+    position: relative;
+    width: 100%;
+    height: 372px;
+    color: #fff;
+    background: var(--band);
+    overflow: hidden;
+  }
+  @media (max-width: 809.98px) {
+    .footer_stage { --footer-pad: 32px; height: 326px; }
+  }
+  .footer_dots {
+    position: absolute;
+    inset: 0;
+    display: block;
+    pointer-events: none;
+  }
+  .footer_curious {
+    position: absolute;
+    left: var(--footer-pad);
+    top: calc(var(--footer-pad) * 1.2);
+    margin: 0;
+    font-size: 18px;
+    line-height: 1.25;
+    white-space: nowrap;
+  }
+  .footer_credit {
+    position: absolute;
+    left: var(--footer-pad);
+    top: calc(var(--footer-pad) * 1.2 + 61px);
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    font-size: 12.5px;
+    line-height: 1.4;
+    color: rgba(255, 255, 255, 0.8);
+  }
+  .footer_credit span:last-child { margin-top: calc(0.4em + 4px); color: rgba(255, 255, 255, 0.5); }
+
+  /* Stand-in for the guestbook — same slot as .footer_book. */
+  .footer_book {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 179.785px;
+    height: 233.163px;
+    margin-left: -89.893px;
+    margin-top: -116.581px;
+    border-radius: 2px 9px 9px 2px;
+    background:
+      radial-gradient(ellipse 60% 45% at 55% 40%, #f2a3d6 0%, transparent 70%),
+      linear-gradient(90deg, #d94fb2 0 6%, #ec5cc5 6% 100%);
+    box-shadow: 0 18px 40px rgba(0, 0, 0, 0.45);
+    display: flex;
+    align-items: flex-end;
+    justify-content: flex-end;
+    padding: 0 12px 14px 0;
+  }
+  .footer_book .tiles {
+    display: grid;
+    grid-template-columns: repeat(5, 24px);
+    gap: 2px 3px;
+    justify-content: end;
+  }
+  .footer_book .tiles span {
+    width: 24px;
+    height: 24px;
+    border-radius: 5px;
+    background: #fff;
+    color: #ec5cc5;
+    font: 800 14px/24px ui-rounded, system-ui, sans-serif;
+    text-align: center;
+  }
+  .footer_book .tiles span:nth-child(odd) { transform: rotate(-8deg); }
+  .footer_book .tiles span:nth-child(even) { transform: rotate(7deg) translateY(2px); }
+  .footer_book .tiles .gap { visibility: hidden; }
+
+  /* --- tuning panel -------------------------------------------------------- */
+  .tune {
+    position: fixed;
+    top: 16px;
+    right: 16px;
+    z-index: 20;
+    width: 264px;
+    max-width: calc(100vw - 32px);
+    max-height: calc(100vh - 32px);
+    overflow: auto;
+    padding: 12px 14px 14px;
+    background: var(--panel-bg);
+    border: 1px solid var(--panel-line);
+    border-radius: 12px;
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.08);
+    backdrop-filter: blur(10px);
+    font-size: 12px;
+  }
+  .tune h2 {
+    margin: 0 0 8px;
+    font-size: 12px;
+    font-weight: 600;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .tune h2 button { font-size: 11px; }
+  .tune[data-collapsed='true'] .tune_body { display: none; }
+  .tune label { display: grid; grid-template-columns: 1fr auto; gap: 2px 8px; margin: 8px 0; }
+  .tune label output { color: var(--muted); font-variant-numeric: tabular-nums; }
+  .tune input[type='range'] { grid-column: 1 / -1; width: 100%; margin: 0; }
+  .tune select { grid-column: 1 / -1; font: inherit; padding: 3px 4px; }
+  .tune .row { display: flex; gap: 6px; margin-top: 10px; }
+  .tune button {
+    font: inherit;
+    padding: 5px 9px;
+    border-radius: 7px;
+    border: 1px solid var(--panel-line);
+    background: #fff;
+    cursor: pointer;
+  }
+  .tune button:active { transform: scale(0.97); }
+</style>
+</head>
+<body>
+
+<aside class="tune" id="tune">
+  <h2>Footer dots <button type="button" id="collapse">Hide</button></h2>
+  <div class="tune_body" id="tune-body"></div>
+</aside>
+
+<main class="spacer">scroll down to the footer ↓</main>
+
+<footer class="footer_stage" id="stage">
+  <canvas class="footer_dots" id="dots" aria-hidden="true"></canvas>
+  <p class="footer_curious">I'd love to know you stopped by,<br />sign my guestbook</p>
+  <p class="footer_credit">
+    <span>Made with lots of joy and afternoon lattes</span>
+    <span>Built with Cursor &amp; Vercel</span>
+    <span>Los Angeles · 10:02 PM</span>
+  </p>
+  <div class="footer_book" id="book" aria-label="Guestbook placeholder">
+    <div class="tiles">
+      <span>G</span><span>U</span><span>E</span><span>S</span><span>T</span>
+      <span class="gap"></span><span>B</span><span>O</span><span>O</span><span>K</span>
+    </div>
+  </div>
+</footer>
+
+<script>
+(() => {
+  /* ------------------------------------------------------------------------
+   * Tunables. Every slider in the panel maps to one of these; "Copy" dumps the
+   * current set as JSON so it can be carried into DotField.tsx later.
+   * --------------------------------------------------------------------- */
+  const DEFAULTS = {
+    theme: 'day',          // day = footer's grey dots, night = white dots
+    dotSpacing: 21,        // matches Footer.tsx
+    dotRadius: 1.485,      // matches Footer.tsx
+    bookPad: 60,           // px — closest any shape may sit to the book's side
+    spread: 1,             // × how far the layout fans out beyond the padding
+    jitter: 0.04,          // random nudge on each layout point (× book size)
+    shapeSize: 12,         // px — largest shape (heart / sparkle)
+    morphMs: 600,          // dot -> shape; the way back runs at exitRatio of this
+    exitRatio: 0.6,       // exits are quicker than entrances
+    staggerMs: 70,         // delay between shapes in one composition
+    holdMs: 800,          // how long the whole composition stays formed
+    restMs: 400,           // plain dots between one composition and the next
+  };
+
+  const CONTROLS = [
+    { key: 'theme', label: 'Theme', type: 'select', options: ['day', 'night'] },
+    { key: 'bookPad', label: 'Padding from book px', min: 20, max: 160, step: 2, rebuild: true },
+    { key: 'spread', label: 'Spread (×)', min: 0.5, max: 1.6, step: 0.05, rebuild: true },
+    { key: 'jitter', label: 'Jitter', min: 0, max: 0.12, step: 0.01, rebuild: true },
+    { key: 'shapeSize', label: 'Shape size px', min: 8, max: 26, step: 1 },
+    { key: 'morphMs', label: 'Morph ms', min: 200, max: 2000, step: 10 },
+    { key: 'exitRatio', label: 'Exit speed (× morph)', min: 0.3, max: 1, step: 0.05 },
+    { key: 'staggerMs', label: 'Stagger ms', min: 0, max: 300, step: 5 },
+    { key: 'holdMs', label: 'Hold ms', min: 0, max: 5000, step: 100 },
+    { key: 'restMs', label: 'Rest between ms', min: 0, max: 3000, step: 50 },
+  ];
+
+  const STORE = 'footer-dots-tune-v4';
+  let cfg = { ...DEFAULTS };
+  try { Object.assign(cfg, JSON.parse(localStorage.getItem(STORE) || '{}')); } catch {}
+  const save = () => { try { localStorage.setItem(STORE, JSON.stringify(cfg)); } catch {} };
+
+  /* Shape colours, keyed off the guestbook's pink. */
+  const PALETTE = ['#fb42e9', '#e7508b', '#eb70da', '#eab9dc', '#fcde1d', '#f8ff66', '#b5ecff', '#179ef9', '#69f353'];
+  /* Relative size of each shape so they read as one family optically. */
+  const SHAPE_SCALE = { circle: 0.66, square: 0.64, diamond: 0.8, plus: 0.9, heart: 1, sparkle: 1 };
+
+  const TAU = Math.PI * 2;
+  const clamp = (v, a = 0, b = 1) => Math.min(b, Math.max(a, v));
+  const lerp = (a, b, t) => a + (b - a) * t;
+  /** CSS-style cubic-bezier(x1, y1, x2, y2) as a function of t in 0..1. */
+  const bezier = (x1, y1, x2, y2) => {
+    const cx = 3 * x1, bx = 3 * (x2 - x1) - cx, ax = 1 - cx - bx;
+    const cy = 3 * y1, by = 3 * (y2 - y1) - cy, ay = 1 - cy - by;
+    const sx = (u) => ((ax * u + bx) * u + cx) * u;
+    const sy = (u) => ((ay * u + by) * u + cy) * u;
+    return (t) => {
+      if (t <= 0) return 0;
+      if (t >= 1) return 1;
+      let lo = 0, hi = 1, u = t;
+      for (let i = 0; i < 24; i++) {
+        const x = sx(u);
+        if (Math.abs(x - t) < 1e-5) break;
+        if (x < t) lo = u; else hi = u;
+        u = (lo + hi) / 2;
+      }
+      return sy(u);
+    };
+  };
+  // Forming is an entrance: strong ease-out, so the change starts immediately.
+  const easeEnter = bezier(0.23, 1, 0.32, 1);
+  // Returning is an on-screen morph: strong ease-in-out, and quicker.
+  const easeExit = bezier(0.77, 0, 0.175, 1);
+  const pick = (arr) => arr[(Math.random() * arr.length) | 0];
+  const shuffle = (arr) => { for (let i = arr.length - 1; i > 0; i--) { const j = (Math.random() * (i + 1)) | 0; [arr[i], arr[j]] = [arr[j], arr[i]]; } return arr; };
+
+  /* ------------------------------------------------------------------------
+   * Outlines. Every shape — and the dot itself — is the same list of N points,
+   * resampled at equal arc length, starting at the top and running clockwise.
+   * Morphing is then just point i of the dot sliding to point i of the shape,
+   * so the dot's edge genuinely bends into a heart / star / plus and back.
+   * Each outline fits a 1 × 1 box centred on the origin.
+   * --------------------------------------------------------------------- */
+  const N = 96;
+
+  /** Radial outline: r(θ) with θ = 0 pointing up, clockwise on screen. */
+  const radial = (r) => Array.from({ length: 720 }, (_, k) => {
+    const th = (k / 720) * TAU;
+    const d = r(th);
+    return [Math.sin(th) * d, -Math.cos(th) * d];
+  });
+  /** Superellipse radius: p = 2 circle, p > 2 squircle, p < 1 concave star. */
+  const superR = (p) => (th) => 1 / Math.pow(Math.pow(Math.abs(Math.cos(th)), p) + Math.pow(Math.abs(Math.sin(th)), p), 1 / p);
+  /** Ray from the centre to the edge of a centred a × b rectangle. */
+  const rectR = (a, b, th) => Math.min(a / (Math.abs(Math.sin(th)) || 1e-9), b / (Math.abs(Math.cos(th)) || 1e-9));
+
+  const RAW = {
+    circle: radial(() => 1),
+    square: radial(superR(7)),
+    diamond: radial((th) => superR(6)(th + Math.PI / 4)),
+    plus: radial((th) => Math.max(rectR(1, 0.36, th), rectR(0.36, 1, th))),
+    sparkle: radial(superR(0.62)),
+    // Classic parametric heart; t = 0 is the dip between the lobes (top-centre).
+    heart: Array.from({ length: 720 }, (_, k) => {
+      const t = (k / 720) * TAU;
+      return [
+        16 * Math.pow(Math.sin(t), 3),
+        -(13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t)),
+      ];
+    }),
+  };
+
+  function normalise(pts) {
+    let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+    for (const [x, y] of pts) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
+    const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2, s = Math.max(x1 - x0, y1 - y0);
+    return pts.map(([x, y]) => [(x - cx) / s, (y - cy) / s]);
+  }
+  function resample(pts) {
+    const len = [0];
+    for (let i = 1; i <= pts.length; i++) {
+      const [ax, ay] = pts[i - 1], [bx, by] = pts[i % pts.length];
+      len.push(len[i - 1] + Math.hypot(bx - ax, by - ay));
+    }
+    const total = len[len.length - 1];
+    const out = new Float32Array(N * 2);
+    let seg = 0;
+    for (let k = 0; k < N; k++) {
+      const target = (k / N) * total;
+      while (len[seg + 1] < target) seg++;
+      const t = (target - len[seg]) / (len[seg + 1] - len[seg] || 1);
+      const [ax, ay] = pts[seg], [bx, by] = pts[(seg + 1) % pts.length];
+      out[k * 2] = lerp(ax, bx, t);
+      out[k * 2 + 1] = lerp(ay, by, t);
+    }
+    return out;
+  }
+  const OUTLINE = {};
+  for (const k in RAW) OUTLINE[k] = resample(normalise(RAW[k]));
+  const DOT = OUTLINE.circle;
+  const SHAPES = Object.keys(OUTLINE);
+
+  const stage = document.getElementById('stage');
+  const book = document.getElementById('book');
+  const canvas = document.getElementById('dots');
+  const ctx = canvas.getContext('2d');
+  const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  let W = 0, H = 0, cols = 0, rows = 0;
+  let bookRect = { x: 0, y: 0, w: 0, h: 0 };
+
+  const dotStyle = () => cfg.theme === 'night'
+    ? { rgb: [255, 255, 255], a: 0.1 }
+    : { rgb: [48, 48, 48], a: 0.365 };
+  const hexRgb = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
+
+  function resize() {
+    const r = stage.getBoundingClientRect();
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    W = r.width; H = r.height;
+    canvas.width = Math.round(W * dpr);
+    canvas.height = Math.round(H * dpr);
+    canvas.style.width = W + 'px';
+    canvas.style.height = H + 'px';
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+    const b = book.getBoundingClientRect();
+    bookRect = { x: b.left - r.left, y: b.top - r.top, w: b.width, h: b.height };
+    cols = Math.ceil(W / cfg.dotSpacing) + 1;
+    rows = Math.ceil(H / cfg.dotSpacing) + 1;
+    // Start a fresh composition on the new layout.
+    play = null;
+    composition = null;
+  }
+
+  /* ------------------------------------------------------------------------
+   * Layout templates, hand-placed around the guestbook.
+   * Each point is [u, v]:
+   *   u = distance out from the book's side, in book widths
+   *   v = height, as a fraction of the book's height from its top
+   * so a template reads the same on either side of the book. Everything sits
+   * in the book's middle band (v ≈ 0.3–0.72) and fans out 0.34–0.92 book
+   * widths from it — the gap next to the book stays clear.
+   * --------------------------------------------------------------------- */
+  const U_MIN = 0.34;
+  const TEMPLATES = {
+    // 3-point scalene triangles
+    tri: [
+      [[0.58, 0.34], [0.74, 0.48], [0.45, 0.59]],
+      [[0.42, 0.36], [0.70, 0.55], [0.36, 0.68]],
+    ],
+    // 4-point spreads: a kite and a diagonal pair of triangles
+    quad: [
+      [[0.52, 0.33], [0.89, 0.55], [0.34, 0.55], [0.52, 0.72]],
+      [[0.58, 0.30], [0.37, 0.47], [0.91, 0.39], [0.73, 0.58]],
+    ],
+    // 2-point diagonals
+    pair: [
+      [[0.66, 0.40], [0.51, 0.61]],
+      [[0.46, 0.55], [0.76, 0.41]],
+      [[0.68, 0.35], [0.45, 0.54]],
+      [[0.92, 0.45], [0.43, 0.36]],
+    ],
+  };
+
+  /**
+   * Book-relative [u, v] -> a grid dot on one side (0 = left, 1 = right).
+   * Snaps outward, away from the book, so snapping never eats into the padding.
+   */
+  function toCell([u, v], side) {
+    const sp = cfg.dotSpacing;
+    const out = cfg.bookPad + (u - U_MIN) * bookRect.w * cfg.spread;
+    const x = side === 0 ? bookRect.x - out : bookRect.x + bookRect.w + out;
+    const y = bookRect.y + v * bookRect.h;
+    const c = side === 0 ? Math.floor(x / sp) : Math.ceil(x / sp);
+    const r = Math.round(y / sp);
+    if (c < 1 || c > cols - 2 || r < 1 || r > rows - 2) return null;
+    return { c, r };
+  }
+
+  /** A template, randomly flipped top-to-bottom and nudged by the jitter. */
+  function vary(tpl) {
+    const flipV = Math.random() < 0.5;
+    const j = cfg.jitter;
+    return tpl.map(([u, v]) => [
+      Math.max(U_MIN, u + (Math.random() * 2 - 1) * j),
+      (flipV ? 1 - v : v) + (Math.random() * 2 - 1) * j,
+    ]);
+  }
+
+  /** Every point lands on its own dot, at least ~2 dots from the others. */
+  function fits(pts) {
+    for (const side of [0, 1]) {
+      const cells = pts.map((p) => toCell(p, side));
+      if (cells.some((q) => !q)) return false;
+      for (let i = 0; i < cells.length; i++)
+        for (let k = i + 1; k < cells.length; k++)
+          if (Math.hypot(cells[i].c - cells[k].c, cells[i].r - cells[k].r) < 1.9) return false;
+    }
+    return true;
+  }
+
+  function group(pool) {
+    const tpl = pick(pool);
+    for (let tries = 0; tries < 12; tries++) {
+      const pts = vary(tpl);
+      if (fits(pts)) return { tpl, pts };
+    }
+    return { tpl, pts: tpl.map((p) => p.slice()) };
+  }
+
+  /**
+   * A composition: 3–4 shapes on one side, 2–3 on the other. Shapes and colours
+   * are dealt without repeats so a group never shows two of the same.
+   */
+  function makeComposition() {
+    const big = group(Math.random() < 0.5 ? TEMPLATES.tri : TEMPLATES.quad);
+    let small;
+    do {
+      small = group(Math.random() < 0.6 ? TEMPLATES.pair : TEMPLATES.tri);
+    } while (small.tpl === big.tpl);
+
+    const shapes = shuffle(Object.keys(OUTLINE));
+    const colors = shuffle(PALETTE.slice());
+    const items = [];
+    const add = (pts, side) => pts.forEach((uv) => {
+      const k = items.length;
+      items.push({
+        side, uv,
+        shape: shapes[k % shapes.length],
+        rgb: hexRgb(colors[k % colors.length]),
+        tilt: (Math.random() - 0.5) * 0.4,
+      });
+    });
+    add(big.pts, 0);
+    add(small.pts, 1);
+    return items;
+  }
+
+  /* ------------------------------------------------------------------------
+   * The loop: play a composition, rest, play its mirror (sides swapped, tilts
+   * reversed), rest, then deal a new composition and repeat.
+   * --------------------------------------------------------------------- */
+  let play = null;
+  let composition = null;
+  let mirrored = false;
+  let firstSide = 0; // which side of the book group 0 lands on (0 = left)
+
+  function nextPlay(now) {
+    if (!composition || mirrored) {
+      composition = makeComposition();
+      mirrored = false;
+      firstSide = Math.random() < 0.5 ? 0 : 1;
+    } else {
+      mirrored = true;
+    }
+    if (!composition) return null;
+
+    const sp = cfg.dotSpacing;
+    const placed = [];
+    for (const it of composition) {
+      const side = mirrored ? 1 - (it.side ^ firstSide) : it.side ^ firstSide;
+      const cell = toCell(it.uv, side);
+      if (!cell) continue; // too narrow a viewport for this point — just skip it
+      placed.push({ ...it, x: cell.c * sp, y: cell.r * sp, cell: cell.r * cols + cell.c, tilt: mirrored ? -it.tilt : it.tilt });
+    }
+    // Form top-to-bottom, so each group sweeps along its own diagonal.
+    placed.sort((p, q) => p.y - q.y || p.x - q.x);
+
+    const n = placed.length;
+    const enter = cfg.morphMs;
+    const exit = cfg.morphMs * cfg.exitRatio;
+    const stagger = cfg.staggerMs;
+    const outAt = now + (n - 1) * stagger + enter + cfg.holdMs;
+    placed.forEach((p, i) => {
+      p.inAt = now + i * stagger;
+      p.outAt = outAt + i * stagger;
+    });
+    return { placed, enter, exit, end: outAt + (n - 1) * stagger + exit + cfg.restMs };
+  }
+
+  function baseDot(x, y, alpha) {
+    const { rgb } = dotStyle();
+    ctx.fillStyle = `rgba(${rgb[0]}, ${rgb[1]}, ${rgb[2]}, ${alpha})`;
+    ctx.beginPath();
+    ctx.arc(x, y, cfg.dotRadius, 0, TAU);
+    ctx.fill();
+  }
+
+  function tracePath(p, e) {
+    const target = OUTLINE[p.shape];
+    const size = lerp(cfg.dotRadius * 2, cfg.shapeSize * SHAPE_SCALE[p.shape], e);
+    const cos = Math.cos(p.tilt * e), sin = Math.sin(p.tilt * e);
+    ctx.beginPath();
+    for (let k = 0; k < N; k++) {
+      const px = lerp(DOT[k * 2], target[k * 2], e) * size;
+      const py = lerp(DOT[k * 2 + 1], target[k * 2 + 1], e) * size;
+      const x = p.x + px * cos - py * sin;
+      const y = p.y + px * sin + py * cos;
+      if (k === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    }
+    ctx.closePath();
+  }
+
+  /**
+   * One cell at eased progress e: 0 = its dot, 1 = its shape. Outline, size,
+   * tilt and colour ride the same curve, so it reads as the dot itself
+   * changing form. Under reduced motion there is no change of form at all —
+   * the dot and the finished shape simply crossfade in place.
+   */
+  function drawMorph(p, e) {
+    const { rgb, a } = dotStyle();
+    if (reduced) {
+      baseDot(p.x, p.y, a * (1 - e));
+      ctx.fillStyle = `rgba(${p.rgb[0]}, ${p.rgb[1]}, ${p.rgb[2]}, ${e})`;
+      tracePath(p, 1);
+      ctx.fill();
+      return;
+    }
+    ctx.fillStyle = `rgba(${Math.round(lerp(rgb[0], p.rgb[0], e))}, ${Math.round(lerp(rgb[1], p.rgb[1], e))}, ${Math.round(lerp(rgb[2], p.rgb[2], e))}, ${lerp(a, 1, e)})`;
+    tracePath(p, e);
+    ctx.fill();
+  }
+
+  let raf = 0, running = false;
+
+  function frame(now) {
+    ctx.clearRect(0, 0, W, H);
+    // A fresh composition whenever the last one (and its rest) is over — also
+    // what happens after the footer was off screen, so there's no catch-up burst.
+    if (!play || now >= play.end) play = nextPlay(now);
+
+    const active = new Map();
+    if (play) {
+      for (const p of play.placed) {
+        let e = 0;
+        if (now >= p.outAt) e = 1 - easeExit(clamp((now - p.outAt) / play.exit));
+        else if (now >= p.inAt) e = easeEnter(clamp((now - p.inAt) / play.enter));
+        if (e > 0.001) active.set(p.cell, { p, e });
+      }
+    }
+
+    const { a } = dotStyle();
+    const sp = cfg.dotSpacing;
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        const hit = active.get(r * cols + c);
+        if (hit) drawMorph(hit.p, hit.e);
+        else baseDot(c * sp, r * sp, a);
+      }
+    }
+
+    if (running) raf = requestAnimationFrame(frame);
+  }
+
+  function start() {
+    if (running) return;
+    running = true;
+    raf = requestAnimationFrame(frame);
+  }
+  function stop() {
+    running = false;
+    cancelAnimationFrame(raf);
+  }
+
+  // Only animate while the footer is on screen.
+  new IntersectionObserver(([entry]) => {
+    if (entry.isIntersecting) start(); else stop();
+  }).observe(stage);
+
+  new ResizeObserver(resize).observe(stage);
+
+  /* --- panel ------------------------------------------------------------ */
+  const body = document.getElementById('tune-body');
+  const fmt = (v) => (Number.isInteger(v) ? v : v.toFixed(2).replace(/0$/, ''));
+  function buildPanel() {
+    body.innerHTML = '';
+    for (const c of CONTROLS) {
+      const label = document.createElement('label');
+      const name = document.createElement('span');
+      name.textContent = c.label;
+      label.appendChild(name);
+      if (c.type === 'select') {
+        label.appendChild(document.createElement('span'));
+        const sel = document.createElement('select');
+        for (const o of c.options) {
+          const opt = document.createElement('option');
+          opt.value = o; opt.textContent = c.names ? c.names[o] : o;
+          sel.appendChild(opt);
+        }
+        sel.value = cfg[c.key];
+        sel.addEventListener('change', () => { cfg[c.key] = sel.value; save(); });
+        label.appendChild(sel);
+      } else {
+        const out = document.createElement('output');
+        out.textContent = fmt(cfg[c.key]);
+        const input = document.createElement('input');
+        Object.assign(input, { type: 'range', min: c.min, max: c.max, step: c.step, value: cfg[c.key] });
+        input.addEventListener('input', () => {
+          cfg[c.key] = Number(input.value);
+          out.textContent = fmt(cfg[c.key]);
+          save();
+          if (c.rebuild) { composition = null; play = null; }
+        });
+        label.append(out, input);
+      }
+      body.appendChild(label);
+    }
+    const row = document.createElement('div');
+    row.className = 'row';
+    const copy = document.createElement('button');
+    copy.type = 'button'; copy.textContent = 'Copy settings';
+    copy.addEventListener('click', async () => {
+      const text = JSON.stringify(cfg, null, 2);
+      try { await navigator.clipboard.writeText(text); copy.textContent = 'Copied'; }
+      catch { console.log(text); copy.textContent = 'Logged to console'; }
+      setTimeout(() => (copy.textContent = 'Copy settings'), 1400);
+    });
+    const reset = document.createElement('button');
+    reset.type = 'button'; reset.textContent = 'Reset';
+    reset.addEventListener('click', () => { cfg = { ...DEFAULTS }; save(); buildPanel(); composition = null; resize(); });
+    row.append(copy, reset);
+    body.appendChild(row);
+  }
+  buildPanel();
+
+  const tune = document.getElementById('tune');
+  const collapse = document.getElementById('collapse');
+  collapse.addEventListener('click', () => {
+    const c = tune.dataset.collapsed === 'true';
+    tune.dataset.collapsed = c ? 'false' : 'true';
+    collapse.textContent = c ? 'Hide' : 'Show';
+  });
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,150 @@
+.book3d-stage {
+  width: var(--book-w, 276px);
+  aspect-ratio: var(--book-aspect, 0.66) / 1;
+  position: relative;
+  perspective: 1500px;
+  perspective-origin: 50% 50%;
+}
+
+.book3d {
+  position: absolute;
+  inset: 0;
+  transform-style: preserve-3d;
+  transform-origin: 0% 100%;
+  transform: rotateY(0deg) translateZ(0);
+  transition: transform 720ms cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: transform;
+}
+
+.book3d-stage:hover .book3d,
+.book3d-stage:focus-within .book3d {
+  transform: translateZ(24px) rotateY(calc(var(--book-angle, 52deg) * -1)) rotateX(-1.5deg);
+}
+
+/* --- faces ------------------------------------------------------------- */
+
+.book3d-cover {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border-radius: 2px 5px 5px 2px;
+  background: linear-gradient(#ffffff 0%, #525252 100%);
+  backface-visibility: hidden;
+}
+
+.book3d-art {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  border-radius: inherit;
+  user-select: none;
+}
+
+/* Page block: paper edges, hinged off the cover's right edge. */
+.book3d-foreedge {
+  position: absolute;
+  top: 2.5%;
+  bottom: 1.5%;
+  right: 0;
+  width: var(--book-depth, 28px);
+  transform-origin: 0% 50%;
+  transform: rotateY(90deg) translateZ(-2px);
+  background:
+    repeating-linear-gradient(
+      to right,
+      rgba(0, 0, 0, 0.05) 0px,
+      rgba(0, 0, 0, 0) 1.2px,
+      rgba(0, 0, 0, 0) 3px,
+      rgba(0, 0, 0, 0.05) 4px
+    ),
+    linear-gradient(90deg, #ffffff 0%, #ededed 65%, #d8d8d8 100%);
+}
+
+/* Back board, one full depth behind the cover. */
+.book3d-back {
+  position: absolute;
+  inset: 0;
+  transform: translateZ(calc(var(--book-depth, 28px) * -1));
+  border-radius: 6px;
+  background: linear-gradient(90deg, rgba(26, 26, 26, 0.22) 0%, #757575 111%);
+  /* Ambient shadow lives on the back board so it never paints over the
+     page block the way a shadow on the cover plane would. */
+  box-shadow:
+    0 18px 44px -14px rgba(0, 0, 0, 0.3),
+    0 3px 10px -3px rgba(0, 0, 0, 0.22);
+}
+
+/* --- cover surface detail ---------------------------------------------- */
+
+.book3d-spine {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 8%;
+  overflow: hidden;
+  opacity: 0.33;
+  border-radius: 2px 4px 4px 2px;
+  pointer-events: none;
+}
+
+.book3d-spine span {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+}
+
+.book3d-spine-left {
+  left: calc(9.09091% - 2px);
+  width: 4px;
+  background: linear-gradient(90deg, rgba(0, 0, 0, 0.58) 0%, #ffffff 100%);
+}
+
+.book3d-spine-mid {
+  left: calc(45.4545% - 6.5px);
+  width: 13px;
+  background: linear-gradient(
+    270deg,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(0, 0, 0, 0.19) 43%,
+    rgba(166, 166, 166, 0.76) 100%
+  );
+}
+
+.book3d-spine-right {
+  left: calc(86.3636% - 2.5px);
+  width: 5px;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.25) 0%, rgba(0, 0, 0, 0.1) 93.5%);
+}
+
+.book3d-gloss {
+  position: absolute;
+  inset: 0;
+  border-radius: 2px 4px 4px 2px;
+  background: linear-gradient(236deg, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0.59) 106%);
+  opacity: 0.35;
+  mix-blend-mode: soft-light;
+  pointer-events: none;
+}
+
+.book3d-inner-light {
+  position: absolute;
+  inset: 0;
+  mix-blend-mode: lighten;
+  pointer-events: none;
+  box-shadow:
+    inset 0 0.711334px 1.84947px -0.75px rgba(255, 255, 255, 0.12),
+    inset 0 1.93715px 5.0366px -1.5px rgba(255, 255, 255, 0.11),
+    inset 0 4.25328px 11.0585px -2.25px rgba(255, 255, 255, 0.11),
+    inset 0 9.44132px 24.5474px -3px rgba(255, 255, 255, 0.09),
+    inset 0 24px 62.4px -3.75px rgba(255, 255, 255, 0.04);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .book3d {
+    transition-duration: 1ms;
+  }
+}

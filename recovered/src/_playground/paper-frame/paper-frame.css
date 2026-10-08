@@ -1,0 +1,119 @@
+/* ─────────────────────────────────────────────────────────────
+   Paper Frame — soft, out-of-focus print on textured paper.
+
+   <div class="paper">                         ← textured sheet
+     <div class="pf" style="width:420px;height:440px">
+       <img src="anything.jpg">                ← img / gif / video / svg / any HTML
+     </div>
+   </div>
+
+   The .pf box is where the print's edge sits (≈50% opacity).
+   The feather bleeds *outward* past it, like ink soaking in,
+   so leave some room around it (don't clip with overflow:hidden).
+
+   Tune per frame with CSS custom properties (defaults below).
+   ───────────────────────────────────────────────────────────── */
+
+.paper {
+  --paper: #fcfaf5;          /* sheet colour */
+  --paper-tooth: .45;        /* fine grain / tooth strength (0–1) */
+  --paper-relief: .35;       /* large soft wrinkles (0–1) */
+  --paper-weave: .05;        /* canvas cross-weave (0–.2) */
+
+  position: relative;
+  isolation: isolate;
+  background:
+    radial-gradient(120% 90% at 50% 45%, transparent 55%, rgb(120 100 70 / .10) 100%),
+    var(--paper);
+}
+
+/* Large, soft undulations — reads as a slightly buckled sheet. */
+.paper::before,
+/* Fine tooth + optional canvas weave — sits on top of the print too,
+   so the image looks printed *into* the paper, not pasted over it. */
+.paper::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  mix-blend-mode: multiply;
+  z-index: 2;
+}
+
+.paper::before {
+  opacity: var(--paper-relief);
+  background-size: 900px 900px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='900' height='900'%3E%3Cfilter id='r' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.0035' numOctaves='4' seed='7' stitchTiles='stitch'/%3E%3CfeDiffuseLighting lighting-color='%23fff' surfaceScale='9'%3E%3CfeDistantLight azimuth='225' elevation='62'/%3E%3C/feDiffuseLighting%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23r)'/%3E%3C/svg%3E");
+}
+
+.paper::after {
+  opacity: var(--paper-tooth);
+  background-size: 260px 260px, 3px 3px, 3px 3px;
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='260' height='260'%3E%3Cfilter id='t' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.75' numOctaves='4' seed='3' stitchTiles='stitch'/%3E%3CfeDiffuseLighting lighting-color='%23fff' surfaceScale='1.4'%3E%3CfeDistantLight azimuth='45' elevation='68'/%3E%3C/feDiffuseLighting%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23t)'/%3E%3C/svg%3E"),
+    linear-gradient(90deg, rgb(90 70 40 / var(--paper-weave)) 1px, transparent 1px),
+    linear-gradient(0deg,  rgb(90 70 40 / var(--paper-weave)) 1px, transparent 1px);
+}
+
+/* ── The frame ─────────────────────────────────────────────── */
+
+.pf {
+  --pf-focus: 6px;           /* how out-of-focus the image itself is */
+  --pf-feather: 40px;        /* softness of the edge */
+  --pf-wobble: 22px;         /* how uneven the edge outline is */
+  --pf-wobble-freq: .008;    /* size of the wobbles (lower = broader) */
+  --pf-spray: 20px;          /* mottled, airbrushed falloff */
+  --pf-radius: 36px;         /* corner rounding before feathering */
+  --pf-seed: 4;              /* change for a different edge shape */
+  --pf-halo: .7;             /* colour bleed around the print (0–1) */
+  --pf-halo-blur: 38px;      /* how far that bleed travels */
+  --pf-saturate: 1.15;       /* ink punch */
+  --pf-contrast: .92;        /* <1 = washed, slightly overexposed print */
+  --pf-lift: 1.03;           /* brightness */
+
+  position: relative;
+  z-index: 1;
+  mix-blend-mode: multiply;  /* whites become paper, grain shows through */
+  opacity: 0;
+  transition: opacity .6s ease-out;
+}
+.pf.pf-ready { opacity: 1; }
+
+/* Blurred copy behind the print → the soft colour haze past the edge. */
+.pf-halo {
+  position: absolute;
+  inset: calc(var(--pf-bleed, 0px) * -.35);
+  overflow: hidden;
+  pointer-events: none;
+  opacity: var(--pf-halo);
+  filter: blur(var(--pf-halo-blur)) saturate(1.35);
+}
+
+/* The print itself, feathered by a generated SVG mask. */
+.pf-body {
+  position: absolute;
+  inset: calc(var(--pf-bleed, 0px) * -1);
+  -webkit-mask: var(--pf-mask) 0 0 / 100% 100% no-repeat;
+          mask: var(--pf-mask) 0 0 / 100% 100% no-repeat;
+}
+
+.pf-content {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  filter: blur(var(--pf-focus)) saturate(var(--pf-saturate)) contrast(var(--pf-contrast)) brightness(var(--pf-lift));
+}
+
+/* Media fills the frame like background-size: cover. */
+:is(.pf-content, .pf-halo) > :is(img, video, iframe, canvas, picture, svg, object, embed) {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border: 0;
+}
+:is(.pf-content, .pf-halo) > picture > img { width: 100%; height: 100%; object-fit: cover; }
+
+@media (prefers-reduced-motion: reduce) {
+  .pf { transition: none; }
+}

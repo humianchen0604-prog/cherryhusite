@@ -1,0 +1,632 @@
+/*
+ * Case-study night mode ink. Import AFTER casestudy.css and any page CSS
+ * (tiktok/loom/grumble) so hardcoded black/rgba(0,0,0,…) colors lose.
+ */
+
+:root[data-theme='dark'] .casestudy-root {
+  color: var(--page-fg);
+}
+
+:root[data-theme='dark'] .casestudy-root :is(
+  p,
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6,
+  li,
+  ol,
+  ul,
+  dt,
+  dd,
+  span,
+  div,
+  a,
+  label,
+  strong,
+  em,
+  small,
+  time,
+  figcaption,
+  blockquote,
+  input,
+  textarea,
+  button,
+  td,
+  th
+) {
+  color: rgb(var(--fg-rgb) / 0.88) !important;
+  --framer-text-color: rgb(var(--fg-rgb) / 0.88) !important;
+  caret-color: var(--page-fg);
+}
+
+:root[data-theme='dark'] .casestudy-root :is(
+  .hero-kicker__lead,
+  .hero-kicker__date,
+  .tiktok-takeaway__num,
+  .reach-out__lead,
+  .insight-meta,
+  .spec-label
+) {
+  color: rgb(var(--fg-rgb) / 0.55) !important;
+  --framer-text-color: rgb(var(--fg-rgb) / 0.55) !important;
+}
+
+:root[data-theme='dark'] .casestudy-root ::placeholder {
+  color: rgb(var(--fg-rgb) / 0.4) !important;
+  opacity: 1;
+}
+
+/* Priority / status pills keep light type on their solid fills. */
+:root[data-theme='dark'] .casestudy-root :is(
+  .framer-1dh8q1s,
+  .framer-1j8s6pc,
+  .framer-7plzaz
+) :is(p, span, div, h1, h2, h3, h4, h5, h6) {
+  color: #fff !important;
+  --framer-text-color: #fff !important;
+}
+
+/* Soft panels that page CSS still paints light. */
+:root[data-theme='dark'] .casestudy-root :is(
+  .reach-out__field,
+  .hl-frame
+) {
+  background-color: rgb(255 255 255 / 0.07);
+}
+
+:root[data-theme='dark'] .casestudy-root .reach-out__field {
+  border-color: rgb(255 255 255 / 0.18);
+}
+
+:root[data-theme='dark'] .casestudy-root .hl-frame {
+  border: 0.5pt solid rgb(255 255 255 / 0.18);
+}
+
+/* Custom password caret — light mode is #000; force full white at night. */
+:root[data-theme='dark'] .casestudy-root .reach-out__caret {
+  background: #fff;
+}
+
+:root[data-theme='dark'] .casestudy-root .reach-out__rule {
+  border-top-color: rgb(255 255 255 / 0.2);
+}
+
+/* Reach-out: white lock, soft-white Send, 80% sub line. */
+:root[data-theme='dark'] .casestudy-root .reach-out__lock {
+  color: #fff !important;
+}
+
+:root[data-theme='dark'] .casestudy-root button.reach-out__button,
+:root[data-theme='dark'] .casestudy-root .reach-out__button {
+  background: rgb(255 255 255 / 0.8) !important;
+  color: #111 !important;
+}
+
+:root[data-theme='dark'] .casestudy-root button.reach-out__button:disabled,
+:root[data-theme='dark'] .casestudy-root .reach-out__button:disabled {
+  background: rgb(255 255 255 / 0.8) !important;
+  color: #111 !important;
+  opacity: 0.35;
+}
+
+:root[data-theme='dark'] .casestudy-root .reach-out__gate[data-status='success'] button.reach-out__button:disabled,
+:root[data-theme='dark'] .casestudy-root .reach-out__gate[data-status='success'] .reach-out__button:disabled {
+  background: rgb(255 255 255 / 0.8) !important;
+  color: #111 !important;
+  opacity: 1;
+}
+
+:root[data-theme='dark'] .casestudy-root .reach-out__button :is(
+  .reach-out__send-label,
+  .reach-out__send-done,
+  span
+) {
+  color: inherit !important;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  :root[data-theme='dark'] .casestudy-root .reach-out__button:hover:not(:disabled) {
+    background: rgb(255 255 255 / 0.92) !important;
+    color: #000 !important;
+  }
+}
+
+:root[data-theme='dark'] .casestudy-root .reach-out__sub {
+  color: rgb(255 255 255 / 0.8) !important;
+  --framer-text-color: rgb(255 255 255 / 0.8) !important;
+}
+
+:root[data-theme='dark'] .casestudy-root .reach-out__sub :is(a, button, .reach-out__email) {
+  color: rgb(255 255 255 / 0.8) !important;
+}
+
+/* Notes inline icon — match body copy ink in night. */
+:root[data-theme='dark'] .casestudy-root .notes-inline-icon {
+  color: rgb(var(--fg-rgb) / 0.88) !important;
+}
+
+/* Priority findings: keep light-mode #fafafa ground + dark ink. */
+:root[data-theme='dark'] .casestudy-root .insight-card {
+  background: #fafafa !important;
+  background-color: #fafafa !important;
+}
+
+:root[data-theme='dark'] .casestudy-root .insight-card :is(
+  p, h1, h2, h3, h4, h5, h6, span, div, strong, em, small, figcaption
+) {
+  color: rgba(0, 0, 0, 0.72) !important;
+  --framer-text-color: rgba(0, 0, 0, 0.72) !important;
+}
+
+/* Hierarchy compare frames: same #fafafa ground in night. */
+:root[data-theme='dark'] .casestudy-root .hierarchy-compare__frame {
+  background: #fafafa !important;
+  background-color: #fafafa !important;
+}
+
+/* Text-only 107fbv6 blocks (AI note + other-designs captions) — no soft fill. */
+:root[data-theme='dark'] .casestudy-root .framer-1vex2lg > .framer-107fbv6,
+:root[data-theme='dark'] .casestudy-root .other-designs-row > .framer-107fbv6 {
+  background: transparent !important;
+  background-color: transparent !important;
+}
+
+/* Takeaway cards: soft fill + hairline stroke + blur; text cursor. */
+:root[data-theme='dark'] .casestudy-root .framer-z42bak > :is(.framer-107fbv6, .framer-1owjcv7) {
+  cursor: text;
+  background-color: rgb(255 255 255 / 0.07) !important;
+  border: 0.5pt solid rgb(255 255 255 / 0.18) !important;
+  backdrop-filter: blur(28px) saturate(1.15);
+  -webkit-backdrop-filter: blur(28px) saturate(1.15);
+  isolation: isolate;
+}
+
+:root[data-theme='dark'] .casestudy-root .framer-z42bak > :is(.framer-107fbv6, .framer-1owjcv7) :is(
+  p, h1, h2, h3, h4, h5, h6, span, div, strong, em, small
+) {
+  color: rgb(var(--fg-rgb) / 0.88) !important;
+  --framer-text-color: rgb(var(--fg-rgb) / 0.88) !important;
+}
+
+:root[data-theme='dark'] .casestudy-root .framer-z42bak > :is(.framer-107fbv6, .framer-1owjcv7) .insight-title {
+  color: var(--page-fg) !important;
+  --framer-text-color: var(--page-fg) !important;
+}
+
+/* Takeaway icons: lighter hues in night; light mode keeps authored colors
+   via .takeaway-icon--* below. Paths use currentColor. */
+.casestudy-root .takeaway-icon--blue {
+  color: #3071a1;
+}
+
+.casestudy-root .takeaway-icon--green {
+  color: #428758;
+}
+
+.casestudy-root .takeaway-icon--amber {
+  color: #a6572e;
+}
+
+.casestudy-root .takeaway-icon--violet {
+  color: #6b5aa8;
+}
+
+:root[data-theme='dark'] .casestudy-root .takeaway-icon--blue {
+  color: #9fccf0 !important;
+}
+
+:root[data-theme='dark'] .casestudy-root .takeaway-icon--green {
+  color: #8fd9a8 !important;
+}
+
+:root[data-theme='dark'] .casestudy-root .takeaway-icon--amber {
+  color: #e8a57a !important;
+}
+
+:root[data-theme='dark'] .casestudy-root .takeaway-icon--violet {
+  color: #c4b5f5 !important;
+}
+
+:root[data-theme='dark'] .casestudy-root .takeaway-icon path {
+  stroke: currentColor !important;
+}
+
+/* Side nav: restore alpha-based ink (broad button rule above would flatten it).
+   Idle: 0.35 × 0.8 × 1.1 ≈ 0.31. */
+:root[data-theme='dark'] .casestudy-root .side-nav .side-nav__item:not([data-active='true']):not(:hover):not(:focus-visible) {
+  color: rgb(var(--fg-rgb) / 0.31) !important;
+}
+
+:root[data-theme='dark'] .casestudy-root .side-nav .side-nav__item[data-active='true'] {
+  color: rgb(var(--fg-rgb) / 0.9) !important;
+}
+
+:root[data-theme='dark'] .casestudy-root .side-nav .side-nav__item:hover,
+:root[data-theme='dark'] .casestudy-root .side-nav .side-nav__item:focus-visible {
+  color: rgb(var(--fg-rgb) / 0.8) !important;
+}
+
+:root[data-theme='dark'] .casestudy-root .side-nav :is(.side-nav__clip, .side-nav__label, span) {
+  color: inherit !important;
+}
+
+/* Theme toggle + Back: 80% white on case studies. */
+:root[data-theme='dark'] .casestudy-root .casestudy-theme-toggle .theme-toggle {
+  opacity: 1 !important;
+}
+
+:root[data-theme='dark'] .casestudy-root .casestudy-theme-toggle :is(
+  .theme-toggle,
+  .theme-toggle__label,
+  .theme-toggle__icon
+) {
+  color: rgb(255 255 255 / 0.8) !important;
+}
+
+:root[data-theme='dark'] .casestudy-root .casestudy-theme-toggle .theme-toggle:hover,
+:root[data-theme='dark'] .casestudy-root .casestudy-theme-toggle .theme-toggle:focus-visible,
+:root[data-theme='dark'] .casestudy-root .casestudy-theme-toggle .theme-toggle:hover :is(
+  .theme-toggle__label,
+  .theme-toggle__icon
+),
+:root[data-theme='dark'] .casestudy-root .casestudy-theme-toggle .theme-toggle:focus-visible :is(
+  .theme-toggle__label,
+  .theme-toggle__icon
+) {
+  color: rgb(255 255 255 / 0.9) !important;
+}
+
+:root[data-theme='dark'] .casestudy-root .casestudy-theme-toggle svg [stroke] {
+  stroke: currentColor !important;
+}
+
+:root[data-theme='dark'] .casestudy-root .framer-1sfw5kb {
+  color: rgb(255 255 255 / 0.8) !important;
+}
+
+:root[data-theme='dark'] .casestudy-root .framer-1sfw5kb .framer-text {
+  color: inherit !important;
+  --framer-text-color: currentColor !important;
+}
+
+:root[data-theme='dark'] .casestudy-root .framer-1sfw5kb .framer-wxuqll {
+  color: inherit !important;
+  filter: none;
+  opacity: 1;
+  background-image: none !important;
+  background-color: currentColor;
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 9 7'%3E%3Cpath fill='%23000' d='M0.804 2.706 L0.468 3.042 L0.133 2.706 L0.468 2.372 Z M8.866 6.502 C8.876 6.676 8.787 6.842 8.637 6.932 C8.486 7.022 8.299 7.022 8.149 6.932 C7.998 6.842 7.91 6.676 7.919 6.502 Z M2.838 5.413 L0.468 3.042 L1.139 2.371 L3.51 4.742 Z M0.468 2.372 L2.838 0 L3.51 0.671 L1.137 3.041 L0.467 2.369 Z M0.804 2.232 L5.546 2.232 L5.546 3.18 L0.804 3.18 Z M8.866 5.552 L8.866 6.502 L7.919 6.502 L7.919 5.552 Z M5.546 2.232 C7.379 2.232 8.866 3.719 8.866 5.552 L7.919 5.552 C7.919 4.923 7.668 4.32 7.223 3.875 C6.778 3.43 6.175 3.18 5.546 3.18 Z'/%3E%3C/svg%3E");
+  -webkit-mask-size: 100% 100%;
+  -webkit-mask-repeat: no-repeat;
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 9 7'%3E%3Cpath fill='%23000' d='M0.804 2.706 L0.468 3.042 L0.133 2.706 L0.468 2.372 Z M8.866 6.502 C8.876 6.676 8.787 6.842 8.637 6.932 C8.486 7.022 8.299 7.022 8.149 6.932 C7.998 6.842 7.91 6.676 7.919 6.502 Z M2.838 5.413 L0.468 3.042 L1.139 2.371 L3.51 4.742 Z M0.468 2.372 L2.838 0 L3.51 0.671 L1.137 3.041 L0.467 2.369 Z M0.804 2.232 L5.546 2.232 L5.546 3.18 L0.804 3.18 Z M8.866 5.552 L8.866 6.502 L7.919 6.502 L7.919 5.552 Z M5.546 2.232 C7.379 2.232 8.866 3.719 8.866 5.552 L7.919 5.552 C7.919 4.923 7.668 4.32 7.223 3.875 C6.778 3.43 6.175 3.18 5.546 3.18 Z'/%3E%3C/svg%3E");
+  mask-size: 100% 100%;
+  mask-repeat: no-repeat;
+}
+
+/* --- Reach-out: no frosted panel — sit on the night gradient ---------------- */
+:root[data-theme='dark'] .casestudy-root .reach-out__frame {
+  background: transparent !important;
+  background-color: transparent !important;
+}
+
+/* --- Loom: pastel cards keep dark ink; soft panels match takeaways --------- */
+:root[data-theme='dark'] .casestudy-root :is(
+  .loom-card,
+  .loom-criteria__item,
+  .loom-inset,
+  .loom-tradeoff,
+  .loom-rule__col
+) {
+  color: #000 !important;
+}
+
+:root[data-theme='dark'] .casestudy-root :is(
+  .loom-card,
+  .loom-criteria__item,
+  .loom-inset,
+  .loom-tradeoff,
+  .loom-rule__col
+) :is(p, h1, h2, h3, h4, h5, h6, li, span, div, a, strong, em, small, label, button, td, th) {
+  color: inherit !important;
+  --framer-text-color: currentColor !important;
+}
+
+:root[data-theme='dark'] .casestudy-root :is(
+  .loom-card__title,
+  .loom-criteria__name
+) {
+  color: #000 !important;
+  --framer-text-color: #000 !important;
+}
+
+:root[data-theme='dark'] .casestudy-root :is(
+  .loom-card__body,
+  .loom-criteria__body
+) {
+  color: rgba(0, 0, 0, 0.62) !important;
+  --framer-text-color: rgba(0, 0, 0, 0.62) !important;
+}
+
+:root[data-theme='dark'] .casestudy-root .loom-card__num {
+  color: rgba(0, 0, 0, 0.35) !important;
+}
+
+/* Soft panels — same 7% fill + hairline stroke as takeaways. */
+:root[data-theme='dark'] .casestudy-root :is(
+  .loom-pair--card .loom-pair__col,
+  .loom-step,
+  .loom-process-reel,
+  .loom-overview-placeholder
+) {
+  background-color: rgb(255 255 255 / 0.07) !important;
+  border: 0.5pt solid rgb(255 255 255 / 0.18) !important;
+}
+
+:root[data-theme='dark'] .casestudy-root :is(
+  .loom-pair--card .loom-pair__col,
+  .loom-step
+) {
+  color: rgb(var(--fg-rgb) / 0.88) !important;
+}
+
+:root[data-theme='dark'] .casestudy-root :is(
+  .loom-pair--card .loom-pair__col,
+  .loom-step
+) :is(p, h1, h2, h3, h4, h5, h6, li, span, div, a, strong, em, small, label) {
+  color: inherit !important;
+  --framer-text-color: currentColor !important;
+}
+
+:root[data-theme='dark'] .casestudy-root .loom-step__label {
+  color: rgb(var(--fg-rgb) / 0.88) !important;
+}
+
+:root[data-theme='dark'] .casestudy-root .loom-step__num {
+  color: rgb(var(--fg-rgb) / 0.45) !important;
+}
+
+:root[data-theme='dark'] .casestudy-root .loom-pair--card .loom-badge {
+  color: rgb(var(--fg-rgb) / 0.72) !important;
+}
+
+/* Filled prototype pill keeps its light blue fill and black text in dark. */
+:root[data-theme='dark'] .casestudy-root :is(.loom-pill, a.loom-pill).loom-pill--filled {
+  background: #e9f5fe !important;
+  border-color: #e9f5fe !important;
+  color: #000 !important;
+}
+
+:root[data-theme='dark'] .casestudy-root :is(.loom-pill, a.loom-pill).loom-pill--filled:hover {
+  background: #d6ecfc !important;
+  border-color: #d6ecfc !important;
+  color: #000 !important;
+}
+
+/* Soft pills — same panel treatment as takeaway cards. */
+:root[data-theme='dark'] .casestudy-root :is(.loom-pill, a.loom-pill) {
+  background: rgb(255 255 255 / 0.07) !important;
+  border-color: rgb(255 255 255 / 0.18) !important;
+  color: rgb(var(--fg-rgb) / 0.88) !important;
+}
+
+:root[data-theme='dark'] .casestudy-root :is(.loom-pill, a.loom-pill) :is(span, div, svg) {
+  color: inherit !important;
+}
+
+:root[data-theme='dark'] .casestudy-root :is(.loom-pill, a.loom-pill):hover {
+  background: rgb(255 255 255 / 0.12) !important;
+  border-color: rgb(255 255 255 / 0.2) !important;
+  color: var(--page-fg) !important;
+}
+
+:root[data-theme='dark'] .casestudy-root .loom-pill--plain-hover:hover {
+  background: rgb(255 255 255 / 0.12) !important;
+  border-color: rgb(255 255 255 / 0.2) !important;
+  color: var(--page-fg) !important;
+}
+
+/* Stage chips keep their tinted fill + authored ink. */
+:root[data-theme='dark'] .casestudy-root .loom-stage--before {
+  background: #fdeadf !important;
+  color: #9a5726 !important;
+}
+
+:root[data-theme='dark'] .casestudy-root .loom-stage--mid {
+  background: #fbf3d6 !important;
+  color: #8a6a1c !important;
+}
+
+:root[data-theme='dark'] .casestudy-root .loom-stage--after {
+  background: #e3f2e7 !important;
+  color: #2f6b41 !important;
+}
+
+:root[data-theme='dark'] .casestudy-root .loom-rule__col--do .loom-rule__flag {
+  background: #cfe8d6 !important;
+  color: #2f6b41 !important;
+}
+
+:root[data-theme='dark'] .casestudy-root .loom-rule__col--dont .loom-rule__flag {
+  background: #f6d5d2 !important;
+  color: #a24237 !important;
+}
+
+/* Tables sit on the night page — light ink + hairline rules. */
+:root[data-theme='dark'] .casestudy-root .loom-table th {
+  color: rgb(var(--fg-rgb) / 0.45) !important;
+  border-bottom-color: rgb(255 255 255 / 0.16) !important;
+}
+
+:root[data-theme='dark'] .casestudy-root .loom-table td {
+  color: rgb(var(--fg-rgb) / 0.72) !important;
+  border-bottom-color: rgb(255 255 255 / 0.08) !important;
+}
+
+:root[data-theme='dark'] .casestudy-root .loom-solution__cost {
+  color: rgb(var(--fg-rgb) / 0.5) !important;
+  border-left-color: rgb(255 255 255 / 0.18) !important;
+}
+
+:root[data-theme='dark'] .casestudy-root .loom-solution__cost-label {
+  color: rgb(var(--fg-rgb) / 0.7) !important;
+}
+
+/* Stroked frames / collapse dividers — light hairlines on the night page. */
+:root[data-theme='dark'] .casestudy-root .loom-note-card {
+  border-color: rgb(255 255 255 / 0.22) !important;
+}
+
+:root[data-theme='dark'] .casestudy-root .loom-module-frame {
+  border-color: rgb(255 255 255 / 0.18) !important;
+}
+
+:root[data-theme='dark'] .casestudy-root .loom-collapse {
+  border-top-color: rgb(255 255 255 / 0.18) !important;
+  border-bottom-color: rgb(255 255 255 / 0.18) !important;
+}
+
+/* Shared divider between the two next-steps collapses. */
+:root[data-theme='dark'] .casestudy-root .loom-collapse-group > .loom-collapse:first-child {
+  border-bottom-color: rgb(255 255 255 / 0.22) !important;
+}
+
+:root[data-theme='dark'] .casestudy-root .loom-collapse__summary {
+  color: rgb(var(--fg-rgb) / 0.72) !important;
+}
+
+:root[data-theme='dark'] .casestudy-root .loom-collapse__icon::before,
+:root[data-theme='dark'] .casestudy-root .loom-collapse__icon::after {
+  background: rgb(var(--fg-rgb) / 0.72) !important;
+}
+
+/* Note-card copy sits on the night page (transparent card) — keep light ink. */
+:root[data-theme='dark'] .casestudy-root .loom-note-card :is(
+  p, h1, h2, h3, h4, h5, h6, span, div, strong, em
+) {
+  color: rgb(var(--fg-rgb) / 0.88) !important;
+  --framer-text-color: rgb(var(--fg-rgb) / 0.88) !important;
+}
+
+:root[data-theme='dark'] .casestudy-root .loom-note-card__topic {
+  color: var(--page-fg) !important;
+}
+
+/* Light-mode purple badge — don't let the global remapping bleach it. */
+:root[data-theme='dark'] .casestudy-root .loom-note-card__icon {
+  background: #f5eeff !important;
+  color: #8a5cf0 !important;
+}
+
+:root[data-theme='dark'] .casestudy-root .loom-note-card__icon :is(div, span, svg) {
+  color: #8a5cf0 !important;
+}
+
+:root[data-theme='dark'] .casestudy-root .loom-note-card__icon svg [stroke] {
+  stroke: #8a5cf0 !important;
+}
+
+/* Module frame captions / labels on the night page stay light. */
+:root[data-theme='dark'] .casestudy-root .loom-module-frame :is(p, span, div, h1, h2, h3, h4) {
+  color: rgb(var(--fg-rgb) / 0.88) !important;
+  --framer-text-color: rgb(var(--fg-rgb) / 0.88) !important;
+}
+
+/* --- Grumble: soft panels + pills match takeaway / loom night tokens -------- */
+
+/* Soft pills — same treatment as .loom-pill. */
+:root[data-theme='dark'] .casestudy-root :is(.grumble-pill, a.grumble-pill) {
+  background: rgb(255 255 255 / 0.07) !important;
+  border-color: rgb(255 255 255 / 0.18) !important;
+  color: rgb(var(--fg-rgb) / 0.88) !important;
+}
+
+:root[data-theme='dark'] .casestudy-root :is(.grumble-pill, a.grumble-pill) :is(span, div, svg) {
+  color: inherit !important;
+}
+
+:root[data-theme='dark'] .casestudy-root :is(.grumble-pill, a.grumble-pill):hover {
+  background: rgb(255 255 255 / 0.12) !important;
+  border-color: rgb(255 255 255 / 0.2) !important;
+  color: var(--page-fg) !important;
+}
+
+/* TLDR / stats cards — soft fill, light ink, hairline stroke (like takeaways). */
+:root[data-theme='dark'] .casestudy-root :is(
+  .grumble-tldr-card,
+  .grumble-stat-card
+) {
+  background-color: rgb(255 255 255 / 0.07) !important;
+  border: 0.5pt solid rgb(255 255 255 / 0.18) !important;
+  backdrop-filter: blur(28px) saturate(1.15);
+  -webkit-backdrop-filter: blur(28px) saturate(1.15);
+  isolation: isolate;
+  color: rgb(var(--fg-rgb) / 0.88) !important;
+}
+
+:root[data-theme='dark'] .casestudy-root :is(
+  .grumble-tldr-card,
+  .grumble-stat-card
+) :is(p, h1, h2, h3, h4, h5, h6, span, div, strong, em, small) {
+  color: inherit !important;
+  --framer-text-color: currentColor !important;
+}
+
+:root[data-theme='dark'] .casestudy-root :is(
+  .grumble-tldr-card__title,
+  .grumble-stat-card__number
+) {
+  color: var(--page-fg) !important;
+}
+
+:root[data-theme='dark'] .casestudy-root :is(
+  .grumble-tldr-card__body,
+  .grumble-stat-card__caption
+) {
+  color: rgb(var(--fg-rgb) / 0.72) !important;
+}
+
+:root[data-theme='dark'] .casestudy-root .grumble-tldr-card__num {
+  color: rgb(var(--fg-rgb) / 0.45) !important;
+}
+
+/* Symptom chips — soft fill + light stroke/ink. */
+:root[data-theme='dark'] .casestudy-root .grumble-symptom {
+  background-color: rgb(255 255 255 / 0.07) !important;
+  border-color: rgb(255 255 255 / 0.18) !important;
+  backdrop-filter: blur(20px) saturate(1.1);
+  -webkit-backdrop-filter: blur(20px) saturate(1.1);
+  isolation: isolate;
+}
+
+:root[data-theme='dark'] .casestudy-root .grumble-symptom__label {
+  color: rgb(var(--fg-rgb) / 0.88) !important;
+}
+
+:root[data-theme='dark'] .casestudy-root .grumble-symptom__icon {
+  color: rgb(var(--fg-rgb) / 0.72) !important;
+}
+
+:root[data-theme='dark'] .casestudy-root .grumble-symptom__icon svg {
+  color: inherit !important;
+}
+
+/* Off-state pictogram marks on night soft panels. */
+:root[data-theme='dark'] .casestudy-root .grumble-pictogram__cell {
+  color: rgb(255 255 255 / 0.18) !important;
+}
+
+:root[data-theme='dark'] .casestudy-root .grumble-ratio__mark:not(.grumble-ratio__mark--on) {
+  stroke: rgb(255 255 255 / 0.22) !important;
+}
+
+:root[data-theme='dark'] .casestudy-root .grumble-embed--deck {
+  border-color: rgb(255 255 255 / 0.18) !important;
+  background: rgb(255 255 255 / 0.07) !important;
+}
+
+/* Backup TikTok 4:3 cover — same night-glass as takeaway cards. */
+:root[data-theme='dark'] .casestudy-root .tiktok-button-preview {
+  background: rgb(255 255 255 / 0.07);
+}

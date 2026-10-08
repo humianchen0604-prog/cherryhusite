@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Paper Frame</title>
+<link rel="stylesheet" href="paper-frame.css">
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    font: 12px/1.4 ui-monospace, "SF Mono", Menlo, monospace;
+    color: #5b554c;
+    -webkit-font-smoothing: antialiased;
+  }
+  .paper { min-height: 100%; display: grid; place-items: center; padding: 96px 16px; overflow: hidden; }
+  #frame { width: min(440px, 78vw); aspect-ratio: 1 / 1.03; }
+
+  /* ── Demo HTML scene (anything can go in a frame) ─────────── */
+  .scene { position: relative; width: 100%; height: 100%; overflow: hidden;
+    background: linear-gradient(#0f7fd6 0%, #1a95e6 45%, #43aef0 68%, #9fd2f3 76%); }
+  .scene .haze { position: absolute; left: -10%; right: -10%; top: 68%; height: 12%;
+    background: radial-gradient(60% 100% at 55% 60%, #fff 0%, rgb(255 255 255 / .6) 45%, transparent 75%); }
+  .scene .cloud { position: absolute; height: 9%; width: 38%; border-radius: 50%;
+    background: rgb(255 255 255 / .55); animation: drift 38s linear infinite; }
+  .scene .cloud.c1 { top: 22%; left: -40%; opacity: .5; }
+  @keyframes drift { to { transform: translateX(420%); } }
+  .scene .grass { position: absolute; left: 0; right: 0; bottom: 0; height: 27%;
+    background: linear-gradient(#233c1c 0%, #4d6a30 35%, #8c9a58 100%); }
+  .scene .cow { position: absolute; left: 30%; bottom: 11%; width: 56%; }
+  @media (prefers-reduced-motion: reduce) { .scene .cloud { animation: none; left: 20%; } }
+
+  /* ── Tuning panel ─────────────────────────────────────────── */
+  .panel { position: fixed; right: 16px; bottom: 16px; width: 256px; z-index: 5; max-height: calc(100% - 32px); overflow: auto;
+    background: rgb(251 249 245 / .86); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgb(90 80 60 / .14); border-radius: 12px; padding: 12px 14px;
+    box-shadow: 0 8px 30px rgb(80 60 30 / .08); }
+  .panel summary { cursor: pointer; font-weight: 600; letter-spacing: .06em; text-transform: uppercase;
+    font-size: 10.5px; color: #8a8171; list-style: none; }
+  .panel summary::-webkit-details-marker { display: none; }
+  .panel[open] summary { margin-bottom: 10px; }
+  .tabs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; margin-bottom: 12px; }
+  .tabs button, .row button { appearance: none; font: inherit; color: inherit; cursor: pointer;
+    border: 1px solid rgb(90 80 60 / .16); background: transparent; border-radius: 7px; padding: 6px 4px;
+    transition: background-color .15s ease-out, transform .1s ease-out; }
+  .tabs button:hover, .row button:hover { background: rgb(90 80 60 / .06); }
+  .tabs button:active, .row button:active { transform: scale(.97); }
+  .tabs button[aria-pressed="true"] { background: #2d2a25; color: #f7f4ee; border-color: #2d2a25; }
+  .ctrl { margin-bottom: 8px; }
+  .ctrl label { display: flex; justify-content: space-between; margin-bottom: 2px; }
+  .ctrl output { font-variant-numeric: tabular-nums; color: #2d2a25; }
+  .ctrl input { width: 100%; accent-color: #2d2a25; margin: 0; }
+  .row { display: flex; gap: 6px; margin-top: 10px; }
+  .row button { flex: 1; }
+  .hint { position: fixed; left: 16px; bottom: 16px; z-index: 5; color: #a39a8a; max-width: 30ch; }
+  .drop .paper { outline: 2px dashed #a39a8a; outline-offset: -12px; }
+  @media (max-width: 600px) { .panel { left: 16px; width: auto; } .hint { display: none; } }
+</style>
+</head>
+<body>
+
+<main class="paper">
+  <div class="pf" id="frame"></div>
+</main>
+
+<p class="hint">Drop any image, GIF or video onto the page to put it in the frame.</p>
+
+<details class="panel" open>
+  <summary>Paper Frame</summary>
+  <div class="tabs" role="group" aria-label="Content">
+    <button data-src="scene" aria-pressed="true">HTML</button>
+    <button data-src="photo">Photo</button>
+    <button data-src="file">Your file</button>
+  </div>
+  <div id="ctrls"></div>
+  <div class="row">
+    <button id="reseed">New edge</button>
+    <button id="copy">Copy CSS</button>
+  </div>
+  <input type="file" id="file" accept="image/*,video/*" hidden>
+</details>
+
+<template id="scene">
+  <div class="scene">
+    <div class="cloud c1"></div>
+    <div class="haze"></div>
+    <div class="grass"></div>
+    <svg class="cow" viewBox="0 0 200 140" aria-hidden="true">
+      <defs><clipPath id="cowbody"><rect x="28" y="34" width="118" height="56" rx="24"/></clipPath></defs>
+      <path d="M32 48 q-8 20 -4 46" stroke="#1d1c1a" stroke-width="3" fill="none"/>
+      <g fill="#ece8df">
+        <rect x="38" y="78" width="11" height="48" rx="4"/><rect x="54" y="80" width="11" height="46" rx="4"/>
+        <rect x="116" y="80" width="11" height="46" rx="4"/><rect x="131" y="78" width="11" height="48" rx="4"/>
+      </g>
+      <g fill="#6b6259"><rect x="38" y="120" width="11" height="7"/><rect x="54" y="120" width="11" height="7"/>
+        <rect x="116" y="120" width="11" height="7"/><rect x="131" y="120" width="11" height="7"/></g>
+      <rect x="28" y="34" width="118" height="56" rx="24" fill="#f1ede5"/>
+      <g clip-path="url(#cowbody)" fill="#1d1c1a">
+        <path d="M60 30 C85 28 92 55 84 70 C76 86 58 80 56 62 C54 48 44 42 60 30Z"/>
+        <path d="M98 30 H150 V95 H118 C104 80 120 66 108 56 C98 48 92 38 98 30Z"/>
+        <ellipse cx="40" cy="80" rx="14" ry="10"/>
+      </g>
+      <path d="M140 42 L160 30 L166 52 L146 70Z" fill="#1d1c1a"/>
+      <ellipse cx="170" cy="46" rx="17" ry="14" fill="#1d1c1a"/>
+      <path d="M170 34 q10 4 12 20 q-6 4 -12 0Z" fill="#f1ede5"/>
+      <ellipse cx="180" cy="55" rx="8" ry="6" fill="#e9c9bd"/>
+      <path d="M160 36 l-8 -6 l3 8Z M178 33 l10 -7" stroke="#e6e0d4" stroke-width="3" fill="#1d1c1a"/>
+    </svg>
+  </div>
+</template>
+
+<script src="paper-frame.js"></script>
+<script>
+(() => {
+  const frame = document.getElementById('frame');
+  const PHOTO = 'https://picsum.photos/id/1025/900/900';
+  let objectURL = null;
+
+  // name, css var, min, max, step, unit, default
+  const params = [
+    ['Focus blur',   '--pf-focus',       0, 20, .5, 'px', 6],
+    ['Edge feather', '--pf-feather',     0, 90, 1,  'px', 40],
+    ['Edge wobble',  '--pf-wobble',      0, 60, 1,  'px', 22],
+    ['Wobble size',  '--pf-wobble-freq', .002, .04, .001, '', .008],
+    ['Spray',        '--pf-spray',       0, 80, 1,  'px', 20],
+    ['Corner',       '--pf-radius',      0, 200, 1, 'px', 36],
+    ['Colour bleed', '--pf-halo',        0, 1, .05, '', .7],
+    ['Bleed spread', '--pf-halo-blur',   0, 80, 1,  'px', 38],
+    ['Ink punch',    '--pf-saturate',    .5, 2, .05, '', 1.15],
+    ['Contrast',     '--pf-contrast',    .5, 1.3, .01, '', .92],
+    ['Paper tooth',  '--paper-tooth',    0, 1, .05, '', .45],
+    ['Wrinkles',     '--paper-relief',   0, 1, .05, '', .35],
+    ['Canvas weave', '--paper-weave',    0, .2, .01, '', .05],
+  ];
+  const maskVars = new Set(['--pf-feather', '--pf-wobble', '--pf-wobble-freq', '--pf-spray', '--pf-radius']);
+  const paper = document.querySelector('.paper');
+  const ctrls = document.getElementById('ctrls');
+  const values = {};
+
+  for (const [name, v, min, max, step, unit, def] of params) {
+    const id = 'c' + v.replace(/\W/g, '');
+    const wrap = document.createElement('div');
+    wrap.className = 'ctrl';
+    wrap.innerHTML = `<label for="${id}">${name}<output>${def}${unit}</output></label>
+      <input id="${id}" type="range" min="${min}" max="${max}" step="${step}" value="${def}">`;
+    const input = wrap.querySelector('input'), out = wrap.querySelector('output');
+    const target = v.startsWith('--paper') ? paper : frame;
+    values[v] = def + unit;
+    input.addEventListener('input', () => {
+      values[v] = input.value + unit;
+      out.textContent = values[v];
+      target.style.setProperty(v, values[v]);
+      if (maskVars.has(v)) PaperFrame.refresh(frame);
+    });
+    ctrls.append(wrap);
+  }
+
+  let seed = 4;
+  document.getElementById('reseed').addEventListener('click', () => {
+    seed = 1 + Math.floor(Math.random() * 999);
+    frame.style.setProperty('--pf-seed', seed);
+    values['--pf-seed'] = seed;
+    PaperFrame.refresh(frame);
+  });
+
+  document.getElementById('copy').addEventListener('click', async (e) => {
+    const css = Object.entries({ '--pf-seed': seed, ...values }).map(([k, v]) => `${k}: ${v};`).join('\n');
+    try { await navigator.clipboard.writeText(css); e.target.textContent = 'Copied'; }
+    catch { console.log(css); e.target.textContent = 'See console'; }
+    setTimeout(() => (e.target.textContent = 'Copy CSS'), 1400);
+  });
+
+  const tabs = document.querySelectorAll('.tabs button');
+  const select = (src) => tabs.forEach(b => b.setAttribute('aria-pressed', b.dataset.src === src));
+
+  function showFile(file) {
+    if (!file) return;
+    if (objectURL) URL.revokeObjectURL(objectURL);
+    objectURL = URL.createObjectURL(file);
+    const el = file.type.startsWith('video')
+      ? Object.assign(document.createElement('video'), { src: objectURL, autoplay: true, loop: true, muted: true, playsInline: true })
+      : Object.assign(document.createElement('img'), { src: objectURL, alt: '' });
+    PaperFrame.set(frame, el);
+    select('file');
+  }
+
+  const file = document.getElementById('file');
+  file.addEventListener('change', () => showFile(file.files[0]));
+
+  tabs.forEach(b => b.addEventListener('click', () => {
+    const src = b.dataset.src;
+    if (src === 'file') return file.click();
+    select(src);
+    if (src === 'scene') PaperFrame.set(frame, document.getElementById('scene').content.cloneNode(true).firstElementChild);
+    if (src === 'photo') PaperFrame.set(frame, `<img src="${PHOTO}" alt="">`);
+  }));
+
+  addEventListener('dragover', (e) => { e.preventDefault(); document.body.classList.add('drop'); });
+  addEventListener('dragleave', (e) => { if (!e.relatedTarget) document.body.classList.remove('drop'); });
+  addEventListener('drop', (e) => {
+    e.preventDefault(); document.body.classList.remove('drop');
+    showFile(e.dataTransfer.files[0]);
+  });
+
+  PaperFrame.set(frame, document.getElementById('scene').content.cloneNode(true).firstElementChild);
+})();
+</script>
+</body>
+</html>

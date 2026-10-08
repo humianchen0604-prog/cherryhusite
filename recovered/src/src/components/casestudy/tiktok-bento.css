@@ -1,0 +1,138 @@
+/* Shared TikTok seven-panel bento — used on the case-study hero and the
+   homepage project-card cover. Traced from 1506×1080 motion frame.
+   Gap 26; cols 740|740; left rows 384|669; right 251|527|249;
+   top-right 467|245; bottom-right 357|355; cell radius 10. */
+.tiktok-bento {
+  --tiktok-bento-gap: calc(26 / 1506 * 100cqw);
+  --tiktok-bento-radius: calc(10 / 1506 * 100cqw);
+  container-type: inline-size;
+  container-name: tiktok-bento;
+  box-sizing: border-box;
+  width: 100%;
+  height: auto;
+  max-height: 100svh;
+  aspect-ratio: 1506 / 1080;
+  display: grid;
+  grid-template-columns: 740fr 740fr;
+  /* cqw on this node (the container) does not resolve against itself, so the
+     column gap was inheriting a larger ancestor measure. % is this box. */
+  gap: calc(26 / 1506 * 100%);
+  background: transparent;
+  overflow: visible;
+}
+
+.tiktok-bento__left,
+.tiktok-bento__right,
+.tiktok-bento__right-top,
+.tiktok-bento__right-bottom {
+  display: grid;
+  gap: var(--tiktok-bento-gap);
+  min-width: 0;
+  min-height: 0;
+}
+
+.tiktok-bento__left {
+  grid-template-rows: 384fr 669fr;
+}
+
+.tiktok-bento__right {
+  grid-template-rows: 251fr 527fr 249fr;
+}
+
+.tiktok-bento__right-top {
+  grid-template-columns: 467fr 245fr;
+}
+
+.tiktok-bento__right-bottom {
+  grid-template-columns: 357fr 355fr;
+}
+
+.tiktok-bento__cell {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  border-radius: var(--tiktok-bento-radius);
+  overflow: hidden;
+}
+
+.tiktok-bento__cell > img,
+.tiktok-bento__cell > video {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+}
+
+.tiktok-bento__cell--logo {
+  background: #000;
+  display: grid;
+  place-items: center;
+}
+
+.tiktok-bento__cell--logo > img.tiktok-bento__logo {
+  width: 53%;
+  max-width: 185px;
+  height: auto;
+  object-fit: contain;
+  pointer-events: none;
+  user-select: none;
+}
+
+.tiktok-bento__cell--phones,
+.tiktok-bento__cell--accounts,
+.tiktok-bento__cell--flow,
+.tiktok-bento__cell--tooltip {
+  background: #f2f2f2;
+}
+
+.tiktok-bento__cell--accounts {
+  display: grid;
+  place-items: center;
+}
+
+.tiktok-bento__cell--accounts > img.tiktok-bento__accounts {
+  width: 82%;
+  height: auto;
+  max-height: 78%;
+  object-fit: contain;
+  pointer-events: none;
+  user-select: none;
+}
+
+.tiktok-bento__cell--cyan {
+  background: #29e6e5;
+  display: grid;
+  place-items: center;
+}
+
+.tiktok-bento__cell--cyan > video.tiktok-bento__cyan {
+  width: auto;
+  height: 78%;
+  max-width: 78%;
+  object-fit: contain;
+}
+
+.tiktok-bento__cell--pink {
+  background: #fe2857;
+  display: grid;
+  place-items: center;
+  place-content: center;
+}
+
+.tiktok-bento__cell--pink > img.tiktok-bento__pink {
+  display: block;
+  width: auto;
+  height: auto;
+  max-width: 78%;
+  max-height: 86%;
+  margin: 0;
+  object-fit: contain;
+  object-position: center;
+  justify-self: center;
+  align-self: center;
+  transform: scale(1.2);
+  transform-origin: center center;
+  pointer-events: none;
+  user-select: none;
+}

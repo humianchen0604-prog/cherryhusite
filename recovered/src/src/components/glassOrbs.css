@@ -1,0 +1,102 @@
+/* Glass orbs — see GlassOrbs.tsx. The Figma frame (402 × 874, near-black)
+   shown inside an iPhone bezel on a white page. */
+
+.glass-orbs {
+  --orbs-bg: #0c0c0c;
+  --phone-radius: 62px;
+  --bezel: 12px;
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  place-items: center;
+  padding: 40px 16px;
+  background: #ffffff;
+  overflow: auto;
+}
+
+/* Bezel: black band with a thin titanium edge and a soft drop shadow. */
+.glass-orbs__phone {
+  padding: var(--bezel);
+  border-radius: calc(var(--phone-radius) + var(--bezel));
+  background: #111;
+  box-shadow:
+    0 0 0 1.5px #3a3a3c,
+    0 0 0 3px #c9c9ce,
+    0 30px 60px -20px rgb(0 0 0 / 0.35),
+    0 12px 24px -12px rgb(0 0 0 / 0.25);
+}
+
+.glass-orbs__stage {
+  position: relative;
+  background: var(--orbs-bg);
+  border-radius: var(--phone-radius);
+  overflow: hidden;
+  /* Keeps the canvas clipped to the rounded corners in Safari. */
+  isolation: isolate;
+}
+
+.glass-orbs__island {
+  position: absolute;
+  top: 11px;
+  left: 50%;
+  width: 124px;
+  height: 36px;
+  border-radius: 999px;
+  background: #000;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+.glass-orbs__canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  transition: opacity 400ms ease-out;
+}
+.glass-orbs__canvas[data-ready='true'] {
+  opacity: 1;
+}
+
+/* Plain pills: shown until the shader is ready, and for browsers without WebGL2. */
+.glass-orbs__fallback img {
+  position: absolute;
+  object-fit: cover;
+  border-radius: 9999px;
+  filter: saturate(0.95);
+  mask-image: radial-gradient(closest-side, #000 88%, transparent 100%);
+  transition: opacity 400ms ease-out;
+}
+.glass-orbs__fallback[data-hidden='true'] img {
+  opacity: 0;
+}
+
+/* Top and bottom fades from the Figma frame (80px, 4px backdrop blur). */
+.glass-orbs__fade {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 80px;
+  pointer-events: none;
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+.glass-orbs__fade--top {
+  top: 0;
+  background: linear-gradient(to bottom, rgb(12 12 12 / 0.4), rgb(12 12 12 / 0));
+  mask-image: linear-gradient(to bottom, #000, transparent);
+}
+.glass-orbs__fade--bottom {
+  bottom: 0;
+  background: linear-gradient(to bottom, rgb(12 12 12 / 0), var(--orbs-bg));
+  mask-image: linear-gradient(to top, #000, transparent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .glass-orbs__canvas,
+  .glass-orbs__fallback img {
+    transition: none;
+  }
+}

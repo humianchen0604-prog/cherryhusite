@@ -1,0 +1,319 @@
+/*
+ * "What I'm into" sticker board — Figma node 1815:2669, file
+ * DfbSPhyOyXqGekwuDuRAbM, a 588 x 580 frame of loose objects on #fafafa.
+ *
+ * Every sticker is placed from that frame's own coordinates, converted to `cqw`
+ * against the board (see FRAME_W in AboutStickerBoard.tsx), so the whole
+ * collage scales as one piece instead of drifting apart at other widths. The
+ * board is the container the `cqw` resolves against.
+ *
+ * Drag offsets are also in `cqw` rather than px, so a sticker a viewer moved
+ * keeps its position relative to the board when the window resizes.
+ */
+
+.asb-board {
+  container-type: inline-size;
+  /* Covers the whole About frame (envelope included), which is what its `cqw`
+     resolve against. No clip of its own — `.about-frame` clips — and click-
+     through except on the stickers, so the envelope underneath still gets its
+     hover and click (the host hit-tests by coordinates). Stacked above the
+     envelope (its iframe is z-index 3) so a sticker dropped on it stays on
+     top. */
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  pointer-events: none;
+}
+
+/* --- stickers ----------------------------------------------------------- */
+
+/* Outer box = the sticker's axis-aligned bounding box in the Figma frame.
+   It owns position and the drag offset only; rotation lives on .asb-art so
+   dragging never has to re-derive the angle. */
+.asb-sticker {
+  pointer-events: auto;
+  position: absolute;
+  left: var(--x);
+  top: var(--y);
+  width: var(--w);
+  height: var(--h);
+  z-index: var(--z, 1);
+  transform: translate(var(--dx, 0), var(--dy, 0));
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.asb-sticker[data-dragging] {
+  cursor: grabbing;
+  will-change: transform;
+}
+
+/* Inner box = the sticker's true (unrotated) size, centred in the bounding box
+   and turned in place — Figma reports the AABB for a rotated node, so the two
+   only agree at the centre. Hover scale lives here (not on .asb-sticker) so it
+   composes with rotate without fighting the outer drag translate. */
+.asb-art {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: var(--iw, 100%);
+  height: var(--ih, 100%);
+  transform: translate(-50%, -50%) rotate(var(--rot, 0deg)) scale(1);
+  transform-origin: center center;
+  /* Exact props + strong ease-out — interruptible on quick enter/leave. */
+  transition: transform 200ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+/* Fine-pointer only: touch devices fire :hover on tap and would leave stickers
+   stuck at 1.05. Skip while dragging so grab doesn't fight the scale. */
+@media (hover: hover) and (pointer: fine) {
+  .asb-sticker:hover:not([data-dragging]) .asb-art {
+    transform: translate(-50%, -50%) rotate(var(--rot, 0deg)) scale(1.03);
+  }
+}
+
+.asb-img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  /* Kills the browser's own drag ghost so the pointer drag is the only one. */
+  -webkit-user-drag: none;
+  user-select: none;
+  pointer-events: none;
+}
+
+/* Night: paint the T's lettering solid black over the grey, through an
+   ink-only mask (the plate stays) — the plate is light, so dark ink is what
+   reads on it against the night board. */
+:root[data-theme='dark'] .asb-sticker[data-sticker='text-tool'] .asb-art::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: #000;
+  pointer-events: none;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
+  -webkit-mask-size: contain;
+  mask-size: contain;
+  -webkit-mask-mode: alpha;
+  mask-mode: alpha;
+  -webkit-mask-image: url('/assets/about-board/text-tool-ink.png');
+  mask-image: url('/assets/about-board/text-tool-ink.png');
+}
+
+/* The three colour circles read a touch loud beside the other tools. On the
+   image, not the sticker, so the drag box and hover scale are unaffected. */
+.asb-sticker[data-sticker='colors'] .asb-img {
+  opacity: 0.85;
+}
+
+/* --- TV ------------------------------------------------------------------
+   The clip plays on the TV's own screen. Box = the screen's bounds in tv.png
+   (434,458 – 1662,1499 of 2096 x 1952), and the mask is that screen's exact
+   rounded, slightly bulged shape cut from the same image, so the video never
+   paints over the bezel. Hidden until it is actually playing, so the static
+   screen shows at rest and there is no black flash while it starts. */
+.asb-tv-screen {
+  position: absolute;
+  left: 20.706%;
+  top: 23.463%;
+  width: 58.588%;
+  height: 53.33%;
+  display: block;
+  object-fit: cover;
+  -webkit-mask-image: url('/assets/about-board/tv-screen-mask.png');
+  mask-image: url('/assets/about-board/tv-screen-mask.png');
+  -webkit-mask-size: 100% 100%;
+  mask-size: 100% 100%;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  opacity: 0;
+  transition: opacity 150ms ease-out;
+  pointer-events: none;
+  -webkit-user-drag: none;
+}
+
+.asb-tv-screen[data-on] {
+  opacity: 1;
+}
+
+/* --- "My design philosophy" hint ---------------------------------------- */
+
+.asb-hint {
+  position: absolute;
+  left: var(--hx);
+  top: var(--hy);
+  width: var(--hw);
+  height: var(--hh);
+  pointer-events: none;
+  user-select: none;
+}
+
+.asb-hint__text {
+  position: absolute;
+  margin: 0;
+  font-family: 'Caveat', cursive;
+  font-weight: 400;
+  line-height: 0.9;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  /* Same ink as the star and arrow drawn beside it. */
+  color: #a66565;
+  transform: rotate(-9deg);
+  transform-origin: 0 50%;
+}
+
+/* Each line is revealed left to right by a soft-edged mask, so the words
+   appear the way a pen writes them rather than fading in. The mask is 220%
+   wide with its edge at its midpoint: parked right (100%) the edge sits just
+   left of the text, parked left (0%) just past its end. Padding (cancelled by
+   the negative margin) keeps Caveat's descenders and overhangs inside the
+   masked box, which is also its clip. */
+.asb-hint__line {
+  display: block;
+  padding: 0.18em 0.12em;
+  margin: -0.18em -0.12em;
+  -webkit-mask-image: linear-gradient(90deg, #000 46%, transparent 54%);
+  mask-image: linear-gradient(90deg, #000 46%, transparent 54%);
+  -webkit-mask-size: 220% 100%;
+  mask-size: 220% 100%;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: 100% 0;
+  mask-position: 100% 0;
+}
+
+.asb-hint__star,
+.asb-hint__arrow {
+  position: absolute;
+  overflow: visible;
+}
+
+.asb-hint__star {
+  transform: rotate(-19deg);
+}
+
+.asb-hint__star path,
+.asb-hint__arrow path {
+  fill: none;
+  stroke: #a66565;
+  stroke-width: 1.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  /* pathLength=1 on each path: a dash as long as the whole stroke, pushed
+     fully off, then pulled back in — the pen travelling from one tip to the
+     other in the path's own drawing order. The gap is a touch longer than the
+     path and the dash starts a hair past it: with round caps, a dash that
+     merely touches either end of the path paints a dot there before drawing. */
+  stroke-dasharray: 1 1.1;
+  stroke-dashoffset: 1.01;
+}
+
+/* Words and doodles are drawn together (~1.15s in all):
+     "My design" 0.1–0.5s, with the star starting on "My" (0.15–0.6s);
+     "philosophy" 0.5–1s, with the arrow starting a few letters in —
+     shaft 0.6–0.95s, then its head 0.95–1.15s. */
+.asb-hint[data-drawn] .asb-hint__line--1 {
+  animation: asb-write 0.4s cubic-bezier(0.4, 0.1, 0.6, 0.95) 0.1s forwards;
+}
+
+.asb-hint[data-drawn] .asb-hint__star path {
+  animation: asb-draw 0.45s cubic-bezier(0.5, 0.1, 0.4, 1) 0.15s forwards;
+}
+
+.asb-hint[data-drawn] .asb-hint__line--2 {
+  animation: asb-write 0.5s cubic-bezier(0.4, 0.1, 0.6, 0.95) 0.5s forwards;
+}
+
+/* Arrow: shaft from the words down to the point, then the head's two barbs. */
+.asb-hint[data-drawn] .asb-hint__shaft {
+  animation: asb-draw 0.35s cubic-bezier(0.45, 0.05, 0.4, 1) 0.6s forwards;
+}
+
+.asb-hint[data-drawn] .asb-hint__head {
+  animation: asb-draw 0.2s cubic-bezier(0.3, 0.1, 0.4, 1) 0.95s forwards;
+}
+
+/* Night: the rose ink is too dim on the navy board, so the words and the
+   doodles all turn white together. */
+:root[data-theme='dark'] .asb-hint__text {
+  color: #fff;
+}
+
+:root[data-theme='dark'] .asb-hint__star path,
+:root[data-theme='dark'] .asb-hint__arrow path {
+  stroke: #fff;
+}
+
+@keyframes asb-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes asb-write {
+  to {
+    -webkit-mask-position: 0 0;
+    mask-position: 0 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .asb-hint__line {
+    -webkit-mask-image: none;
+    mask-image: none;
+  }
+
+  .asb-hint__star path,
+  .asb-hint__arrow path,
+  .asb-hint[data-drawn] .asb-hint__star path,
+  .asb-hint[data-drawn] .asb-hint__shaft,
+  .asb-hint[data-drawn] .asb-hint__head {
+    animation: none;
+    stroke-dashoffset: 0;
+  }
+}
+
+/* --- record player ------------------------------------------------------
+   <WallRecordPlayer> fills a 1 : 2 box — the player on top, its cord below.
+   The box itself stays click-through so the empty space beside the cord
+   doesn't grab drags or hovers; the player's body and bead opt back in, and
+   their events still bubble up to this sticker's drag handlers. */
+
+.asb-sticker[data-sticker='vinyl'] {
+  pointer-events: none;
+}
+
+/* Hover scale grows from the player's own centre, not the middle of the cord. */
+.asb-sticker[data-sticker='vinyl'] .asb-art {
+  transform-origin: 50% 25%;
+}
+
+/* --- book ---------------------------------------------------------------- */
+
+/* Book3D draws its own stage at --book-w; the sticker box is the AABB of that
+   cover once rotated, so the stage is centred inside it rather than filling it. */
+.asb-book {
+  display: grid;
+  place-items: center;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .asb-art {
+    transition: none;
+  }
+  .asb-sticker {
+    transition: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) and (hover: hover) and (pointer: fine) {
+  .asb-sticker:hover:not([data-dragging]) .asb-art {
+    transform: translate(-50%, -50%) rotate(var(--rot, 0deg)) scale(1);
+  }
+}

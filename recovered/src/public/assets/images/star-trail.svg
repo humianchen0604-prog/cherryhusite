@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" fill="none" aria-hidden="true">
+  <!-- Four-point sparkle traced from star-trail.png — vertically elongated, concave waist. -->
+  <path
+    fill="currentColor"
+    d="M50 3C50.9 29 55.2 43.5 81 50C55.2 56.5 50.9 71 50 97C49.1 71 44.8 56.5 19 50C44.8 43.5 49.1 29 50 3Z"
+  />
+</svg>

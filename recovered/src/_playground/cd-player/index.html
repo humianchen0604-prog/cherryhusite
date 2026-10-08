@@ -1,0 +1,597 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wall Record Player</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    background: #fafafa;
+    font: 12px/1.4 ui-monospace, "SF Mono", Menlo, monospace;
+    color: #5b554c;
+    -webkit-font-smoothing: antialiased;
+  }
+  .stage { min-height: 100%; display: grid; place-items: center; padding: 64px 16px; }
+
+  /* ───────────────────────────────────────────────────────────────────────
+     Wall-mounted record player (MUJI CD player shape) with a pull cord.
+
+     Everything inside is sized in `cqw` against the root's own width, so the
+     whole object scales from one number — `--size` — and can drop straight
+     into a sticker box later. 100cqw = the player's width. The cord hangs
+     CORD_LEN (below, in JS) units under it, which is what the aspect-ratio
+     reserves room for.
+     ─────────────────────────────────────────────────────────────────────── */
+  .cdp {
+    --size: 260px;
+    position: relative;
+    width: var(--size);
+    aspect-ratio: 100 / 205;
+    container-type: inline-size;
+    pointer-events: none;          /* only the body and the bead are live */
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* ── cord (drawn behind the body, so it reads as coming out from under) ── */
+  .cdp-cord {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+  }
+  .cdp-cord-line { fill: none; stroke: #fdfdfc; stroke-width: 0.9; stroke-linecap: round; }
+  .cdp-cord-edge { fill: none; stroke: rgb(0 0 0 / 0.1); stroke-width: 1.25; stroke-linecap: round; }
+  .cdp-cord-shadow { fill: none; stroke: rgb(0 0 0 / 0.07); stroke-width: 1.1; stroke-linecap: round; filter: blur(0.5px); }
+  .cdp-bead-shadow { fill: rgb(0 0 0 / 0.08); filter: blur(0.8px); }
+  .cdp-bead { fill: url(#cdp-bead-fill); stroke: rgb(0 0 0 / 0.1); stroke-width: 0.25; }
+  .cdp-bead-hit {
+    fill: transparent;
+    pointer-events: auto;
+    cursor: grab;
+    touch-action: none;
+  }
+  .cdp[data-pulling] .cdp-bead-hit { cursor: grabbing; }
+
+  /* ── body ─────────────────────────────────────────────────────────────── */
+  .cdp-body {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100cqw;
+    height: 100cqw;
+    border-radius: 13cqw;
+    pointer-events: auto;
+    cursor: pointer;
+    outline: none;
+    background: linear-gradient(165deg, #ffffff 0%, #f7f7f5 55%, #f1f1ee 100%);
+    box-shadow:
+      0 0 0 0.35cqw rgb(0 0 0 / 0.045),           /* hairline edge on a near-white board */
+      inset 0 0.5cqw 0 rgb(255 255 255 / 0.9),     /* top edge catching light */
+      inset 0 -1.1cqw 0 rgb(0 0 0 / 0.04),         /* the lip of the bottom face */
+      0 0.6cqw 1.2cqw rgb(0 0 0 / 0.05),
+      0 3.2cqw 6cqw -1cqw rgb(0 0 0 / 0.12);       /* cast onto the wall */
+    transition: box-shadow 200ms ease;
+  }
+  .cdp-body:focus-visible {
+    box-shadow:
+      0 0 0 0.35cqw rgb(0 0 0 / 0.045),
+      0 0 0 1.6cqw #E2FFAF,
+      inset 0 -1.1cqw 0 rgb(0 0 0 / 0.04),
+      0 3.2cqw 6cqw -1cqw rgb(0 0 0 / 0.12);
+  }
+
+  .cdp-grille {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    fill: #8d8d89;
+  }
+
+  /* The shallow round recess the record sits in. */
+  .cdp-well {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 76cqw;
+    height: 76cqw;
+    translate: -50% -50%;
+    border-radius: 50%;
+    background: radial-gradient(circle at 50% 40%, #fbfbfa 0%, #f3f3f1 70%, #ededea 100%);
+    box-shadow:
+      inset 0 0.7cqw 1.2cqw rgb(0 0 0 / 0.07),
+      inset 0 -0.3cqw 0.5cqw rgb(255 255 255 / 0.9),
+      0 0.3cqw 0 rgb(255 255 255 / 0.8);
+  }
+
+  .cdp-disc-wrap {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 66cqw;
+    height: 66cqw;
+    translate: -50% -50%;
+    border-radius: 50%;
+    box-shadow: 0 0.9cqw 1.8cqw rgb(0 0 0 / 0.22), 0 0.2cqw 0.4cqw rgb(0 0 0 / 0.18);
+  }
+  .cdp-disc {
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    will-change: transform;
+  }
+  .cdp-disc img {
+    position: absolute;
+    display: block;
+    -webkit-user-drag: none;
+    user-select: none;
+    pointer-events: none;
+  }
+  .cdp-disc .cdp-vinyl { inset: 0; width: 100%; height: 100%; }
+  /* Misty grey-blue record: `screen` lifts the black vinyl to this colour
+     and keeps the grooves and shine lighter on top. */
+  .cdp-tint { position: absolute; inset: 0; border-radius: 50%; background: #7d91a4; mix-blend-mode: screen; }
+  .cdp-disc .cdp-label {
+    left: 50%;
+    top: 50%;
+    width: 44%;
+    height: 44%;
+    translate: -50% -50%;
+    border-radius: 50%;
+    object-fit: cover;
+    box-shadow: 0 0 0 0.25cqw rgb(0 0 0 / 0.35);
+    filter: brightness(1.18) contrast(1.04);
+  }
+  /* Fixed sheen over the grooves. It does NOT turn with the record — light
+     stays put while the vinyl moves under it, which is what sells the spin. */
+  .cdp-sheen {
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    pointer-events: none;
+    background: conic-gradient(from 20deg,
+      transparent 0deg, rgb(255 255 255 / 0.16) 28deg, transparent 62deg,
+      transparent 180deg, rgb(255 255 255 / 0.1) 210deg, transparent 245deg);
+    -webkit-mask: radial-gradient(circle, transparent 22.5%, #000 23.5%, #000 70%, transparent 100%);
+            mask: radial-gradient(circle, transparent 22.5%, #000 23.5%, #000 70%, transparent 100%);
+    mix-blend-mode: screen;
+  }
+
+  /* Spindle cap. */
+  .cdp-hub {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 15cqw;
+    height: 15cqw;
+    translate: -50% -50%;
+    border-radius: 50%;
+    background: radial-gradient(circle at 50% 38%, #6b6b6a 0%, #4e4e4d 55%, #3d3d3c 100%);
+    box-shadow:
+      0 0.5cqw 1cqw rgb(0 0 0 / 0.3),
+      inset 0 0.3cqw 0.3cqw rgb(255 255 255 / 0.18),
+      inset 0 -0.4cqw 0.5cqw rgb(0 0 0 / 0.3);
+  }
+  .cdp-hub::before {
+    content: "";
+    position: absolute;
+    inset: 28%;
+    border-radius: 50%;
+    background: radial-gradient(circle at 50% 35%, #5c5c5b, #333332);
+    box-shadow: inset 0 0.25cqw 0.35cqw rgb(0 0 0 / 0.45), 0 0.15cqw 0 rgb(255 255 255 / 0.12);
+  }
+  .cdp-hub::after {
+    content: "";
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 1.6cqw;
+    height: 1.6cqw;
+    translate: -50% -50%;
+    border-radius: 50%;
+    background: #1f1f1e;
+  }
+
+  /* ── cursor-follow pill (copied from globals.css .copy-email-pill) ────── */
+  .cdp-pill {
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 100;
+    pointer-events: none;
+    will-change: transform;
+    transform: translate3d(-200px, -200px, 0);
+  }
+  .cdp-pill[data-flip-x] { translate: -100% 0; }
+  .cdp-pill[data-flip-x] .cdp-pill__body { transform-origin: 100% 50%; }
+  .cdp-pill__body {
+    --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+    interpolate-size: allow-keywords;
+    display: flex;
+    align-items: center;
+    box-sizing: content-box;
+    height: 36px;
+    width: 36px;
+    padding: 0;
+    overflow: hidden;
+    border-radius: 8px;
+    color: #3A3632;
+    font-family: 'Switzer', 'Switzer Placeholder', system-ui, sans-serif;
+    font-size: 14px;
+    letter-spacing: -0.1px;
+    line-height: 1;
+    white-space: nowrap;
+    background-color: hsl(33 22% 28% / 0.45);
+    opacity: 0;
+    transform: scale(0.94);
+    transform-origin: 0 50%;
+    transition:
+      width 80ms var(--ease-out),
+      padding 80ms var(--ease-out),
+      transform 80ms var(--ease-out),
+      background-color 140ms ease,
+      opacity 140ms ease;
+  }
+  .cdp-pill.is-on .cdp-pill__body {
+    width: max-content;
+    padding: 0 12px;
+    background-color: #E2FFAF;
+    opacity: 1;
+    transform: scale(1);
+    transition:
+      width 150ms var(--ease-out),
+      padding 150ms var(--ease-out),
+      transform 150ms var(--ease-out),
+      background-color 280ms ease,
+      opacity 200ms ease;
+  }
+  .cdp-pill__icon { display: inline-flex; width: 14px; height: 14px; margin-right: 6px; flex-shrink: 0; }
+  .cdp-pill__icon svg { width: 100%; height: 100%; fill: currentColor; }
+
+  /* ── playground-only tuning panel ────────────────────────────────────── */
+  .panel { position: fixed; right: 16px; bottom: 16px; width: 220px; z-index: 5;
+    background: rgb(251 249 245 / .86); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgb(90 80 60 / .14); border-radius: 12px; padding: 12px 14px; }
+  .panel label { display: flex; justify-content: space-between; margin-bottom: 4px; }
+  .panel input { width: 100%; }
+  .panel p { margin: 10px 0 0; color: #8a8171; }
+</style>
+</head>
+<body>
+
+<main class="stage">
+  <div class="cdp" id="cdp">
+    <svg class="cdp-cord" viewBox="0 0 100 205" aria-hidden="true">
+      <defs>
+        <linearGradient id="cdp-bead-fill" x1="0" x2="1">
+          <stop offset="0" stop-color="#e9e9e6" />
+          <stop offset=".45" stop-color="#ffffff" />
+          <stop offset="1" stop-color="#dededa" />
+        </linearGradient>
+      </defs>
+      <path class="cdp-cord-shadow" />
+      <path class="cdp-cord-edge" />
+      <path class="cdp-cord-line" />
+      <g class="cdp-bead-g">
+        <rect class="cdp-bead-shadow" x="-1.4" y="-4" width="3.6" height="9.5" rx="1.6" transform="translate(1 1.6)" />
+        <path class="cdp-cord-edge cdp-tail-edge" />
+        <path class="cdp-cord-line cdp-tail" />
+        <rect class="cdp-bead" x="-1.8" y="-4.5" width="3.6" height="9.5" rx="1.6" />
+        <rect class="cdp-bead-hit" x="-9" y="-12" width="18" height="26" />
+      </g>
+    </svg>
+
+    <div class="cdp-body" role="button" tabindex="0" aria-pressed="false"
+         aria-label="Play Vultures by John Mayer">
+      <svg class="cdp-grille" viewBox="0 0 100 100" aria-hidden="true"><path /></svg>
+      <div class="cdp-well"></div>
+      <div class="cdp-disc-wrap">
+        <div class="cdp-disc">
+          <img class="cdp-vinyl" src="vinyl-disc.png" alt="" draggable="false">
+          <div class="cdp-tint"></div>
+          <img class="cdp-label" src="vinyl-label.png" alt="" draggable="false">
+        </div>
+        <div class="cdp-sheen"></div>
+      </div>
+      <div class="cdp-hub"></div>
+    </div>
+  </div>
+</main>
+
+<div class="cdp-pill" id="cdp-pill" aria-hidden="true">
+  <div class="cdp-pill__body">
+    <span class="cdp-pill__icon"><svg viewBox="0 0 14 14"><path d="M3.5 2.2v9.6L11.4 7z" /></svg></span>
+    <span class="cdp-pill__label">Play song</span>
+  </div>
+</div>
+
+<aside class="panel">
+  <label for="size">Size <span id="size-out">260px</span></label>
+  <input id="size" type="range" min="80" max="420" value="260">
+  <p>Click the player or pull the cord to play. Pull again to stop.</p>
+</aside>
+
+<script>
+(() => {
+  /* Apple's official 30s preview of "Vultures" (Continuum, 2006), from the
+     iTunes Search API. Swap for a local file in /public if you want the
+     full track. */
+  const SONG_SRC =
+    'https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview221/v4/fd/0b/12/fd0b12d3-337c-8a2c-2462-7b5359b0cd8b/mzaf_10173282892537328649.plus.aac.p.m4a';
+
+  /* Geometry, in units of the player's width (100 = full width). */
+  const ANCHOR = { x: 50, y: 99 };     // where the cord leaves the body
+  const REST_LEN = 86;                 // cord length to the bead at rest
+  const TAIL = 12;                     // stub of cord below the bead
+  const PULL_TRIGGER = 13;             // pull this far and the switch clicks
+  const PULL_MAX = 30;                 // rubber-bands beyond this
+
+  /* 33⅓ rpm. */
+  const SPIN_DEG_PER_S = 200;
+  const VOLUME = 0.8;
+
+  const root = document.getElementById('cdp');
+  const body = root.querySelector('.cdp-body');
+  const disc = root.querySelector('.cdp-disc');
+  const cordLine = root.querySelector('.cdp-cord > .cdp-cord-line');
+  const cordEdge = root.querySelector('.cdp-cord > .cdp-cord-edge');
+  const cordShadow = root.querySelector('.cdp-cord-shadow');
+  const beadG = root.querySelector('.cdp-bead-g');
+  const tail = root.querySelector('.cdp-tail');
+  const tailEdge = root.querySelector('.cdp-tail-edge');
+  const beadHit = root.querySelector('.cdp-bead-hit');
+  const pill = document.getElementById('cdp-pill');
+  const pillLabel = pill.querySelector('.cdp-pill__label');
+  const pillIcon = pill.querySelector('.cdp-pill__icon path');
+
+  const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)');
+
+  /* ── speaker grille ──────────────────────────────────────────────────────
+     Concentric rings of dots between the well and the body's rounded edge,
+     like the perforated front of the MUJI player. One <path> of tiny circles
+     rather than thousands of <circle> nodes. */
+  (function drawGrille() {
+    const STEP = 1.55, DOT = 0.36, INNER = 39.6, INSET = 3.6, CORNER = 10;
+    const inRoundedRect = (x, y) => {
+      const lo = INSET, hi = 100 - INSET;
+      if (x < lo || x > hi || y < lo || y > hi) return false;
+      const cx = Math.min(Math.max(x, lo + CORNER), hi - CORNER);
+      const cy = Math.min(Math.max(y, lo + CORNER), hi - CORNER);
+      return (x - cx) ** 2 + (y - cy) ** 2 <= CORNER ** 2;
+    };
+    let d = '';
+    for (let r = INNER, ring = 0; r < 72; r += STEP, ring++) {
+      const n = Math.round((2 * Math.PI * r) / STEP);
+      const shift = (ring % 2) * 0.5;
+      for (let i = 0; i < n; i++) {
+        const a = ((i + shift) / n) * Math.PI * 2;
+        const x = 50 + r * Math.cos(a), y = 50 + r * Math.sin(a);
+        if (!inRoundedRect(x, y)) continue;
+        d += `M${(x - DOT).toFixed(2)} ${y.toFixed(2)}a${DOT} ${DOT} 0 1 0 ${DOT * 2} 0a${DOT} ${DOT} 0 1 0 ${-DOT * 2} 0`;
+      }
+    }
+    root.querySelector('.cdp-grille path').setAttribute('d', d);
+  })();
+
+  /* ── audio ─────────────────────────────────────────────────────────────── */
+  const audio = new Audio();
+  audio.preload = 'none';
+  audio.src = SONG_SRC;
+  audio.volume = 0;
+
+  let playing = false;
+  let volTarget = 0;
+
+  async function setPlaying(next) {
+    if (next === playing) return;
+    playing = next;
+    syncState();
+    wake();
+    if (playing) {
+      volTarget = VOLUME;
+      try {
+        await audio.play();
+      } catch {
+        playing = false;
+        volTarget = 0;
+        syncState('Couldn’t play');
+      }
+    } else {
+      volTarget = 0;           // fades out, then pauses in the loop
+    }
+  }
+  const toggle = () => setPlaying(!playing);
+
+  function syncState(pillText) {
+    body.setAttribute('aria-pressed', String(playing));
+    body.setAttribute('aria-label', `${playing ? 'Pause' : 'Play'} Vultures by John Mayer`);
+    updatePill(pillText);
+  }
+
+  audio.addEventListener('ended', () => {
+    audio.currentTime = 0;
+    setPlaying(false);
+  });
+
+  /* ── one animation loop for cord, record and volume ─────────────────────
+     Sleeps when everything has settled. */
+  const cord = { x: 0, y: 0, vx: 0, vy: 0 };   // bead offset from rest
+  let angle = 0, speed = 0;
+  let pull = null;                              // active drag
+  let raf = 0, last = 0;
+
+  function wake() {
+    if (!raf) { last = performance.now(); raf = requestAnimationFrame(tick); }
+  }
+
+  function tick(now) {
+    const dt = Math.min(0.05, (now - last) / 1000);
+    last = now;
+    const still = reduceMotion.matches;
+
+    // Record: spin up quickly, coast down slowly like a real platter.
+    const target = playing && !still ? SPIN_DEG_PER_S : 0;
+    const tau = target > speed ? 0.45 : 1.3;
+    speed += (target - speed) * (1 - Math.exp(-dt / tau));
+    if (speed < 0.5 && target === 0) speed = 0;
+    angle = (angle + speed * dt) % 360;
+    disc.style.transform = `rotate(${angle}deg)`;
+
+    // Cord: a damped spring back to rest unless it's being held.
+    if (!pull) {
+      const k = 190, c = still ? 40 : 11;
+      cord.vx += (-k * cord.x - c * cord.vx) * dt;
+      cord.vy += (-k * cord.y - c * cord.vy) * dt;
+      cord.x += cord.vx * dt;
+      cord.y += cord.vy * dt;
+    }
+    drawCord();
+
+    // Volume: short fade in, slightly longer fade out.
+    const v = audio.volume;
+    const step = dt / (volTarget > v ? 0.5 : 0.35);
+    const nv = volTarget > v ? Math.min(volTarget, v + step) : Math.max(volTarget, v - step);
+    try { audio.volume = nv; } catch {}
+    if (nv === 0 && !playing && !audio.paused) audio.pause();
+
+    const cordAtRest = !pull && Math.abs(cord.x) + Math.abs(cord.y) + Math.abs(cord.vx) + Math.abs(cord.vy) < 0.02;
+    const discAtRest = speed === 0 && target === 0;
+    const volAtRest = nv === volTarget;
+    if (cordAtRest && discAtRest && volAtRest) {
+      cord.x = cord.y = cord.vx = cord.vy = 0;
+      drawCord();
+      raf = 0;
+      return;
+    }
+    raf = requestAnimationFrame(tick);
+  }
+
+  function drawCord() {
+    const bx = ANCHOR.x + cord.x;
+    const by = ANCHOR.y + REST_LEN + cord.y;
+    // Pushed up past rest -> the cord goes slack and bows out to one side.
+    const slack = Math.max(0, -cord.y) * 0.9;
+    const cx = ANCHOR.x + cord.x * 0.25 + slack * (cord.x >= 0 ? -1 : 1);
+    const cy = (ANCHOR.y + by) / 2;
+    const d = `M${ANCHOR.x} ${ANCHOR.y}Q${cx.toFixed(2)} ${cy.toFixed(2)} ${bx.toFixed(2)} ${by.toFixed(2)}`;
+    cordLine.setAttribute('d', d);
+    cordEdge.setAttribute('d', d);
+    cordShadow.setAttribute('d', `M${ANCHOR.x + 1.2} ${ANCHOR.y + 2}Q${(cx + 1.2).toFixed(2)} ${(cy + 1.6).toFixed(2)} ${(bx + 1.2).toFixed(2)} ${(by + 1.6).toFixed(2)}`);
+
+    // Bead hangs along the cord's last segment.
+    const tilt = Math.atan2(bx - cx, by - cy) * -180 / Math.PI;
+    beadG.setAttribute('transform', `translate(${bx.toFixed(2)} ${by.toFixed(2)}) rotate(${tilt.toFixed(2)})`);
+    const t = `M0 4.5L0 ${4.5 + TAIL}`;
+    tail.setAttribute('d', t);
+    tailEdge.setAttribute('d', t);
+  }
+
+  /* ── pulling the cord ─────────────────────────────────────────────────── */
+  const unitsPerPx = () => 100 / root.getBoundingClientRect().width;
+
+  beadHit.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    try { beadHit.setPointerCapture(e.pointerId); } catch {}
+    pull = { id: e.pointerId, sx: e.clientX, sy: e.clientY, fired: false, moved: 0 };
+    root.dataset.pulling = '';
+    cord.vx = cord.vy = 0;
+    wake();
+  });
+
+  beadHit.addEventListener('pointermove', (e) => {
+    if (!pull || e.pointerId !== pull.id) return;
+    const u = unitsPerPx();
+    const dx = (e.clientX - pull.sx) * u;
+    const dy = (e.clientY - pull.sy) * u;
+    pull.moved = Math.max(pull.moved, Math.hypot(dx, dy));
+    // A taut cord mostly moves down; sideways it swings on a short leash.
+    cord.x = dx * 0.35;
+    cord.y = dy <= PULL_MAX ? dy : PULL_MAX + (dy - PULL_MAX) * 0.2;
+    if (cord.y < -8) cord.y = -8 + (cord.y + 8) * 0.3;
+    if (!pull.fired && cord.y >= PULL_TRIGGER) {
+      pull.fired = true;
+      toggle();
+    }
+    placePill(e.clientX, e.clientY);
+  });
+
+  function endPull(e) {
+    if (!pull || e.pointerId !== pull.id) return;
+    const tap = !pull.fired && pull.moved < 2;
+    pull = null;
+    delete root.dataset.pulling;
+    if (tap) tug();
+    wake();
+  }
+  beadHit.addEventListener('pointerup', endPull);
+  beadHit.addEventListener('pointercancel', endPull);
+
+  /* Clicking anywhere on the player pulls the cord for you. */
+  function tug() {
+    cord.vy = 240;
+    cord.vx += (Math.random() - 0.5) * 30;
+    toggle();
+    wake();
+  }
+  body.addEventListener('click', tug);
+  body.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); tug(); }
+  });
+
+  /* ── hover: pill + a little nudge of the cord ────────────────────────── */
+  const canHover = () => matchMedia('(hover: hover) and (pointer: fine)').matches;
+  let hovering = false;
+
+  function updatePill(text) {
+    pillLabel.textContent = text || (playing ? 'Pause song' : 'Play song');
+    pillIcon.setAttribute('d', playing && !text ? 'M3 2.2h2.8v9.6H3zM8.2 2.2H11v9.6H8.2z' : 'M3.5 2.2v9.6L11.4 7z');
+  }
+
+  function placePill(x, y) {
+    const w = pill.firstElementChild.scrollWidth || 110;
+    const flip = x + 12 + w > innerWidth - 8;
+    pill.toggleAttribute('data-flip-x', flip);
+    const top = y + 16 + 36 > innerHeight - 8 ? y - 44 : y + 16;
+    pill.style.transform = `translate3d(${flip ? x - 12 : x + 12}px, ${top}px, 0)`;
+  }
+
+  const live = [body, beadHit];
+  live.forEach((el) => {
+    el.addEventListener('pointerenter', (e) => {
+      if (!canHover()) return;
+      if (!hovering && !pull && !reduceMotion.matches) {
+        // A small half-pull, hinting that the cord is the switch.
+        cord.vy += 90;
+        cord.vx += 14 * (e.clientX < body.getBoundingClientRect().left + body.offsetWidth / 2 ? 1 : -1);
+        wake();
+      }
+      hovering = true;
+      updatePill();
+      placePill(e.clientX, e.clientY);
+      pill.classList.add('is-on');
+    });
+    el.addEventListener('pointermove', (e) => { if (hovering) placePill(e.clientX, e.clientY); });
+    el.addEventListener('pointerleave', (e) => {
+      if (pull) return;
+      if (live.includes(e.relatedTarget)) return;
+      hovering = false;
+      pill.classList.remove('is-on');
+    });
+  });
+
+  drawCord();
+
+  /* ── playground panel ─────────────────────────────────────────────────── */
+  const size = document.getElementById('size');
+  const sizeOut = document.getElementById('size-out');
+  size.addEventListener('input', () => {
+    root.style.setProperty('--size', `${size.value}px`);
+    sizeOut.textContent = `${size.value}px`;
+  });
+})();
+</script>
+</body>
+</html>

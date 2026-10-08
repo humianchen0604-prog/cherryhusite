@@ -1,0 +1,1620 @@
+/* Loom — additions on top of casestudy.css.
+ *
+ * Same contract as grumble.css: the page reuses the Lemon8 case-study shell for
+ * every shared decision (page padding and the 140px section rhythm on
+ * .framer-172orq5, section gaps, the h5 eyebrow / h1 title / 14px body presets,
+ * media bands, the takeaway row, the side nav, the back pill and the footer).
+ * Only patterns Loom has and the other two don't live here, and they borrow the
+ * case study's own tokens — 24px gutter, #fafafa card, the 1199.98px collapse
+ * breakpoint — so nothing drifts between the three studies.
+ *
+ * ============================================================================
+ * GOLDEN RULE — spacing around real media (video/image), read this first.
+ * ============================================================================
+ * A <LoomVideo> (or MediaSlot) must be a DIRECT CHILD of the same flex
+ * container as the text it belongs to — e.g. inside <SolutionCard>, right
+ * after its <Body>, exactly like Solution 01 and Solution 02 do it. Putting a
+ * video as a *sibling* of the SolutionCard instead of a child inside it is
+ * the one mistake that breaks this every time: it silently switches which
+ * flex gap applies (the 140px BETWEEN-solutions gap in .loom-solutions —
+ * see below, matches Grumble's own top-level section rhythm — instead of
+ * the 12px WITHIN-a-card gap in .loom-solution), so the media ends up
+ * many times further from its own text than every other block on the page.
+ *
+ * Given correct nesting, spacing is automatic — no manual margin, no asking:
+ *   - Text → media: card's flex gap (12px) + .loom-media's own
+ *     margin-top (var(--case-study-media-gap), 32px) = 44px. This is the
+ *     SAME token Grumble's .grumble-reel uses, so every case study gives
+ *     text-to-media the same air.
+ *   - Media → caption (if any): tight, ~8px (.loom-media-caption's own
+ *     negative margin-top pulls it in — a caption reads as part of the clip).
+ *   - Media → the next block after it: the container's own flex gap.
+ *
+ * Before shipping any new media block, or before touching gap/margin values
+ * near one, check this comment and confirm the video sits INSIDE the same
+ * card as its caption text, not beside it. If the measured gap doesn't match
+ * 44px, that nesting is the first thing to check — not a new margin rule.
+ * ============================================================================
+ */
+
+/* Rich-text wrappers. Framer's base stylesheet absolutely positions an unclassed
+   [data-framer-component-type] node, so eyebrow/title wrappers need the same
+   relative, full-width footing the generated classes give them. */
+.framer-pR67w .loom-rt {
+  position: relative;
+  flex: 0 0 auto;
+  width: 100%;
+  height: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-wrap: break-word;
+}
+
+/* Section eyebrows match the hero kicker — 60% black, not solid. */
+.framer-pR67w .loom-rt > h5.framer-styles-preset-1w502i7 {
+  --framer-text-color: rgba(0, 0, 0, 0.6);
+}
+
+.loom-emphasis {
+  font-weight: 500;
+}
+
+/* Same hand-drawn highlighter as the other two studies, in Loom's violet. */
+.loom-highlight {
+  position: relative;
+  z-index: 0;
+  display: inline;
+  color: inherit;
+}
+
+/* The ::before stroke is one absolutely-positioned box sized off the span's
+   overall bounding rect. If the phrase itself wraps onto two lines, that
+   rect spans both fragments and the mask stretches over the wrong area —
+   invisible or garbled. Scoped (not the base rule) since most highlighted
+   phrases are short enough to never hit this; use it on one that does. */
+.loom-highlight--nowrap {
+  white-space: nowrap;
+}
+.loom-highlight::before {
+  content: '';
+  position: absolute;
+  left: -0.06em;
+  right: -0.06em;
+  bottom: 0.02em;
+  height: calc(0.2em + 2px);
+  background-color: #cfc6ff;
+  -webkit-mask-image: url('/assets/images/lemon8-highlight-stroke.svg');
+  mask-image: url('/assets/images/lemon8-highlight-stroke.svg');
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-size: 100% 100%;
+  mask-size: 100% 100%;
+  z-index: -1;
+}
+
+/* Generic vertical stack for a heading + copy group. 16px matches the gap
+   .framer-eahql uses, so stacks and native sections line up. */
+.loom-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* One-off: doubles the gap above this specific stack — the parent's own
+   16px flex gap (20px at the >=1600px breakpoint, see casestudy.css) already
+   contributes half, so this adds the same amount again on top. */
+.loom-stack--gap-2x {
+  margin-top: 16px;
+}
+
+@media (min-width: 1600px) {
+  .loom-stack--gap-2x {
+    margin-top: 20px;
+  }
+}
+
+/* Same rule, but for when the modifier lands on a p.framer-text (e.g. Body/
+   .loom-closer) instead of a plain div — p.framer-text carries margin:0 at
+   (element + class) specificity, which beats a bare class selector, so this
+   needs the tag to win instead of losing to the reset. */
+p.loom-stack--gap-2x {
+  margin-top: 16px;
+}
+
+@media (min-width: 1600px) {
+  p.loom-stack--gap-2x {
+    margin-top: 20px;
+  }
+}
+
+/* Opens the 140px section rhythm inside a section that already has content —
+   .framer-eahql's own flex gap (16px, 20px under the collapse breakpoint)
+   already contributes some of that, so this margin is the remainder:
+   140 - 16 = 124px desktop, 80 - 20 = 60px collapsed. Was 56/36px, which
+   landed well short of the 140/80px .loom-solutions actually uses for the
+   same "new section starts here" beat. */
+.loom-stack--gap {
+  margin-top: 124px;
+}
+
+@media (max-width: 1199.98px) {
+  .loom-stack--gap {
+    margin-top: 60px;
+  }
+}
+
+/* ---------------------------------------------------------------- Media slots
+   Grey stand-ins for assets that don't exist yet. Each holds the real aspect
+   ratio so the page's vertical rhythm is already correct when media lands —
+   swapping a slot for an <img>/<video> should not move anything below it. */
+.loom-slot {
+  position: relative;
+  width: 100%;
+  box-sizing: border-box;
+  background: #ededed;
+  border: 1px dashed rgba(0, 0, 0, 0.22);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.loom-slot__inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  max-width: 460px;
+  text-align: center;
+}
+
+.loom-slot__kind {
+  font-family: 'Switzer', 'Switzer Placeholder', sans-serif;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(0, 0, 0, 0.45);
+  border: 1px solid rgba(0, 0, 0, 0.2);
+  padding: 3px 8px;
+  border-radius: 100px;
+}
+
+.loom-slot__label {
+  font-family: 'Switzer', 'Switzer Placeholder', sans-serif;
+  font-size: 14px;
+  line-height: 148%;
+  color: rgba(0, 0, 0, 0.62);
+}
+
+.loom-slot__note {
+  font-family: 'Switzer', 'Switzer Placeholder', sans-serif;
+  font-size: 12px;
+  line-height: 145%;
+  color: rgba(0, 0, 0, 0.4);
+}
+
+/* Corner stamp, so the intended crop is legible while the slot is empty. */
+.loom-slot__ratio {
+  position: absolute;
+  right: 10px;
+  bottom: 8px;
+  font-family: 'Switzer', 'Switzer Placeholder', sans-serif;
+  font-size: 11px;
+  color: rgba(0, 0, 0, 0.3);
+}
+
+/* --------------------------------------------------------- Export cycle reel
+   Full-width embed of the live cycling export panel — the iframe owns its
+   own open/hold/fade loop and posts the active person's key up via
+   postMessage; LoomExportCycle just swaps the .loom-media-caption underneath
+   to match, same subtext treatment as every other media caption on the page.
+
+   Same 16:9 ratio as the "Final design" LoomVideo directly above it, so the
+   two sit at the same height at any width. The embedded card is taller than
+   that (a fixed 530x640 box, min(640px, 100vh-48px) against the iframe's own
+   viewport) — it shrinks to fit and auto-scrolls the rest into view instead
+   of overflowing. */
+.loom-export-cycle__frame {
+  aspect-ratio: 16 / 9;
+  background: #fafafa;
+  overflow: hidden;
+  position: relative;
+}
+
+.loom-export-cycle__frame iframe {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  display: block;
+}
+
+/* ----------------------------------------------------------- Content to-write
+   Distinct from a media slot on purpose: this marks copy that doesn't exist
+   yet (quotes, results), not art. Amber so it reads as "unfinished", and it
+   should be gone before the page ships. */
+.loom-todo {
+  width: 100%;
+  box-sizing: border-box;
+  background: #fff9ec;
+  border: 1px solid #f0dcae;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.loom-todo__flag {
+  align-self: flex-start;
+  font-family: 'Switzer', 'Switzer Placeholder', sans-serif;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #8a6a1c;
+  background: #f6e7c2;
+  padding: 3px 8px;
+  border-radius: 100px;
+}
+
+.loom-todo__title {
+  margin: 0;
+  font-family: 'Switzer', 'Switzer Placeholder', sans-serif;
+  font-size: 16px;
+  font-weight: 400;
+  line-height: 130%;
+  color: #000;
+}
+
+.loom-todo__body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.loom-todo__body p {
+  margin: 0;
+  font-family: 'Switzer', 'Switzer Placeholder', sans-serif;
+  font-size: 14px;
+  line-height: 154%;
+  color: rgba(0, 0, 0, 0.62);
+}
+
+.loom-todo__meta {
+  color: rgba(0, 0, 0, 0.45) !important;
+  font-style: italic;
+}
+
+/* ------------------------------------------------------------ Three-up cards
+   Same #fafafa sharp-corner card token as .grumble-tldr-card and .insight-card,
+   so findings here read as the same object the other studies use. */
+.loom-cards {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.loom-card {
+  background: #fafafa;
+  padding: 28px 24px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.loom-card--fail {
+  background: #fdf1f1;
+}
+
+/* The three Key Findings insights get their own colour each — the grey card is
+   the neutral default everywhere else on the page, so tinting only this row
+   marks it as the one set of findings the whole case study turns on. */
+.loom-cards--insights .loom-card:nth-child(1) {
+  background: #fffdd7;
+}
+
+.loom-cards--insights .loom-card:nth-child(2) {
+  background: #eaffd1;
+}
+
+.loom-cards--insights .loom-card:nth-child(3) {
+  background: #e1e5ff;
+}
+
+.loom-card__num {
+  font-family: 'Switzer', 'Switzer Placeholder', sans-serif;
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.35);
+}
+
+.loom-card__title {
+  margin: 0;
+  font-family: 'Switzer', 'Switzer Placeholder', sans-serif;
+  font-size: 16px;
+  font-weight: 400;
+  line-height: 130%;
+  color: #000;
+}
+
+.loom-card__body {
+  margin: 0;
+  font-family: 'Switzer', 'Switzer Placeholder', sans-serif;
+  font-size: 14px;
+  line-height: 154%;
+  color: rgba(0, 0, 0, 0.6);
+}
+
+@media (max-width: 1199.98px) {
+  .loom-cards {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ------------------------------------------------------------- Two-up columns */
+.loom-pair {
+  display: flex;
+  gap: 24px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.loom-pair__col {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+@media (max-width: 1199.98px) {
+  .loom-pair {
+    flex-direction: column;
+  }
+}
+
+/* Same #fafafa sharp-corner card token as .loom-card, moved onto each
+   column here after the three-up "AI works best…" cards above this pair
+   were removed — this pair now carries that visual treatment instead. */
+.loom-pair--card .loom-pair__col {
+  background: #fafafa;
+  padding: 28px 24px;
+  gap: 10px;
+}
+
+/* ------------------------------------------------------------------ Solutions */
+/* Grumble treats each numbered Key Solution as its own top-level page
+   section — a direct child of .framer-172orq5, which carries the site's
+   140px section rhythm (80px under 1200px, see casestudy.css). Loom nests
+   its solutions one level deeper inside .loom-solutions, so this matches
+   that same rhythm explicitly rather than reusing the smaller in-section
+   56px gap, which read as too tight next to Grumble's actual spacing. */
+.loom-solutions {
+  display: flex;
+  flex-direction: column;
+  gap: 140px;
+  width: 100%;
+}
+
+@media (max-width: 1199.98px) {
+  .loom-solutions {
+    gap: 80px;
+  }
+}
+
+.loom-solution {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+}
+
+/* The number now reads as part of the claim rather than a label above it, so
+   it sits inline in the h1 at full title weight, with its own space before
+   the sentence starts. */
+.loom-solution__num {
+  color: #000;
+  margin-right: 0.5em;
+}
+
+/* The cost line every solution carries — stepped back so it reads as a footnote
+   to the claim above it, not as a second claim. */
+.loom-solution__cost {
+  margin: 0;
+  font-family: 'Switzer', 'Switzer Placeholder', sans-serif;
+  font-size: 13px;
+  line-height: 152%;
+  color: rgba(0, 0, 0, 0.5);
+  border-left: 2px solid rgba(0, 0, 0, 0.12);
+  padding-left: 12px;
+}
+
+.loom-solution__cost-label {
+  color: rgba(0, 0, 0, 0.7);
+}
+
+/* Nested aside inside a solution (the toggle-vs-filter rationale). */
+.loom-inset {
+  background: #fafafa;
+  padding: 24px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+}
+
+/* ---------------------------------------------------------------- Data tables
+   The rubric, the golden queries and the scores. Wrapper scrolls on its own so
+   a wide table never makes the page scroll sideways. */
+.loom-table-wrap {
+  width: 100%;
+  overflow-x: auto;
+  box-sizing: border-box;
+}
+
+.loom-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: 'Switzer', 'Switzer Placeholder', sans-serif;
+  font-size: 14px;
+  line-height: 152%;
+  min-width: 560px;
+}
+
+.loom-table th,
+.loom-table td {
+  text-align: left;
+  vertical-align: top;
+  padding: 14px 16px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.loom-table th {
+  font-weight: 400;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: rgba(0, 0, 0, 0.45);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.16);
+  white-space: nowrap;
+}
+
+.loom-table td {
+  color: rgba(0, 0, 0, 0.72);
+}
+
+.loom-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+/* --------------------------------------------------------- Six-criteria list */
+.loom-criteria {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.loom-criteria__item {
+  background: #fafafa;
+  padding: 20px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* Six very light yellow → green → purple tints, one per criterion — same
+   "summer" family the Key Findings row already uses (#fffdd7/#eaffd1/#e1e5ff),
+   extended to a 6-step gradient instead of 3 so each card reads distinct. */
+.loom-criteria__item:nth-child(1) {
+  background: #fffdd7;
+}
+
+.loom-criteria__item:nth-child(2) {
+  background: #f2ffcb;
+}
+
+.loom-criteria__item:nth-child(3) {
+  background: #e5ffd8;
+}
+
+.loom-criteria__item:nth-child(4) {
+  background: #ddf7e6;
+}
+
+.loom-criteria__item:nth-child(5) {
+  background: #e1e5ff;
+}
+
+.loom-criteria__item:nth-child(6) {
+  background: #ede1ff;
+}
+
+.loom-criteria__name {
+  margin: 0;
+  font-family: 'Switzer', 'Switzer Placeholder', sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  color: #000;
+}
+
+.loom-criteria__body {
+  margin: 0;
+  font-family: 'Switzer', 'Switzer Placeholder', sans-serif;
+  font-size: 13px;
+  line-height: 154%;
+  color: rgba(0, 0, 0, 0.6);
+}
+
+@media (max-width: 1199.98px) {
+  .loom-criteria {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ------------------------------------------------------------ Do / Don't rule
+   Carries the one word the AI layer turns on, so it gets colour the rest of the
+   page doesn't — it should be the thing a scanning reader stops on. */
+.loom-rule {
+  display: flex;
+  gap: 16px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.loom-rule__col {
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 20px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.loom-rule__col p {
+  margin: 0;
+  font-family: 'Switzer', 'Switzer Placeholder', sans-serif;
+  font-size: 15px;
+  line-height: 150%;
+  color: rgba(0, 0, 0, 0.8);
+}
+
+.loom-rule__col strong {
+  font-weight: 500;
+}
+
+.loom-rule__flag {
+  align-self: flex-start;
+  font-family: 'Switzer', 'Switzer Placeholder', sans-serif;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 3px 8px;
+  border-radius: 100px;
+}
+
+.loom-rule__col--do {
+  background: #eef7f0;
+}
+.loom-rule__col--do .loom-rule__flag {
+  background: #cfe8d6;
+  color: #2f6b41;
+}
+
+.loom-rule__col--dont {
+  background: #fdf0ef;
+}
+.loom-rule__col--dont .loom-rule__flag {
+  background: #f6d5d2;
+  color: #a24237;
+}
+
+@media (max-width: 1199.98px) {
+  .loom-rule {
+    flex-direction: column;
+  }
+}
+
+/* ------------------------------------------------------- Before / after chips */
+.loom-stage {
+  align-self: flex-start;
+  font-family: 'Switzer', 'Switzer Placeholder', sans-serif;
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 3px 8px;
+  border-radius: 100px;
+  white-space: nowrap;
+  display: inline-block;
+}
+
+.loom-stage--before {
+  background: #fdeadf;
+  color: #9a5726;
+}
+.loom-stage--mid {
+  background: #fbf3d6;
+  color: #8a6a1c;
+}
+.loom-stage--after {
+  background: #e3f2e7;
+  color: #2f6b41;
+}
+
+/* -------------------------------------------------------------- Process steps */
+.loom-steps {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  /* Grid's default align-items:stretch forces every cell to the row's
+     tallest sibling, and since .loom-step doesn't justify its content, that
+     leftover height collects as blank space after the video — different
+     amounts depending on how many lines the title wraps to. align-items:
+     start lets each card size to its own content instead, so a video's
+     bottom padding is always the card's own 20px, not a stretch artifact. */
+  align-items: start;
+  gap: 12px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.loom-step {
+  background: #fafafa;
+  padding: 20px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.loom-step__num {
+  font-family: 'Switzer', 'Switzer Placeholder', sans-serif;
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.35);
+}
+
+.loom-step__label {
+  font-family: 'Switzer', 'Switzer Placeholder', sans-serif;
+  font-size: 14px;
+  line-height: 140%;
+  color: #000;
+  /* Reserves room for 2 lines always, whether a given title wraps to 1 or 2 —
+     without it, a shorter title's video starts higher than a longer title's,
+     so the row's videos (already equal size) end up staggered instead of
+     aligned, and the cards themselves end up uneven heights. */
+  min-height: calc(14px * 1.4 * 2);
+}
+
+@media (max-width: 1199.98px) {
+  .loom-steps {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ------------------------------------------------------- Stage carousel
+   Horizontal, snap-scrolled version of .loom-steps for a stage sequence with
+   only 3 states worth swiping through (Iteration 01's before/in-progress/
+   after). Slides sit at 85% of the track width so the next one always peeks
+   at the trailing edge — the affordance that it scrolls. */
+.loom-carousel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+}
+
+.loom-carousel__track {
+  display: flex;
+  gap: 12px;
+  width: 100%;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+}
+.loom-carousel__track::-webkit-scrollbar {
+  display: none;
+}
+
+.loom-carousel__slide {
+  flex: 0 0 85%;
+  scroll-snap-align: start;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.loom-carousel__media {
+  margin-top: 0;
+}
+
+/* A slide with real footage (video or a static still): fills its frame
+   instead of showing the .loom-slot placeholder chrome — #fafafa ground, no
+   dashed border. object-fit: contain (not cover) — these are portrait screen
+   recordings/captures inside a landscape slide, so cover would crop the
+   top/bottom of every frame; contain keeps the full height in view and lets
+   #fafafa show through on the sides instead. */
+.loom-carousel__media--fill {
+  position: relative;
+  width: 100%;
+  box-sizing: border-box;
+  background: #fafafa;
+  overflow: hidden;
+}
+.loom-carousel__media--fill video,
+.loom-carousel__media--fill img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: contain;
+}
+
+.loom-carousel__caption {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* Dot bar — round dots. The slide currently in full view fills black
+   (.loom-carousel__dot--active); the rest stay a faint outline. Color lives
+   on the dot itself rather than a separate sliding overlay, so it can never
+   drift out of register with the dot it's meant to mark. */
+.loom-carousel__dots {
+  align-self: center;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 6px;
+}
+
+.loom-carousel__dot {
+  width: 6px;
+  height: 6px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.15);
+  cursor: pointer;
+  transition: background 0.3s var(--ease-out, ease);
+}
+
+.loom-carousel__dot--active {
+  background: #000;
+}
+
+@media (max-width: 1199.98px) {
+  .loom-carousel__slide {
+    flex-basis: 86%;
+  }
+}
+
+/* ------------------------------------------------------------ Impact strip
+   Build proof, not outcome proof — deliberately not styled like the Lemon8
+   metric row, which carries real shipped numbers. */
+.loom-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.loom-stat {
+  background: #fafafa;
+  padding: 24px 20px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.loom-stat__value {
+  font-family: 'Switzer', 'Switzer Placeholder', sans-serif;
+  font-size: 16px;
+  line-height: 130%;
+  color: #000;
+}
+
+.loom-stat__label {
+  font-family: 'Switzer', 'Switzer Placeholder', sans-serif;
+  font-size: 13px;
+  line-height: 148%;
+  color: rgba(0, 0, 0, 0.5);
+}
+
+@media (max-width: 1199.98px) {
+  .loom-stats {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* The "this is mocked" line. Plain and quiet on purpose — an honest disclosure
+   that looks like a warning banner reads as an apology. */
+.loom-disclosure {
+  margin: 0;
+  font-family: 'Switzer', 'Switzer Placeholder', sans-serif;
+  font-size: 13px;
+  line-height: 154%;
+  color: rgba(0, 0, 0, 0.5);
+  border-left: 2px solid rgba(0, 0, 0, 0.12);
+  padding-left: 12px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* ------------------------------------------------------------------- Quote */
+.loom-quote {
+  margin: 0;
+  width: 100%;
+  box-sizing: border-box;
+  background: #fafafa;
+  padding: 28px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.loom-quote p {
+  margin: 0;
+  font-family: 'Switzer', 'Switzer Placeholder', sans-serif;
+  font-size: 18px;
+  line-height: 145%;
+  color: rgba(0, 0, 0, 0.85);
+}
+
+.loom-quote cite {
+  font-family: 'Switzer', 'Switzer Placeholder', sans-serif;
+  font-size: 12px;
+  font-style: normal;
+  color: rgba(0, 0, 0, 0.4);
+}
+
+/* -------------------------------------------------------------------- Lists */
+.loom-list {
+  margin: 0;
+  padding-left: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.loom-list li {
+  font-family: 'Switzer', 'Switzer Placeholder', sans-serif;
+  font-size: 14px;
+  line-height: 154%;
+  color: rgba(0, 0, 0, 0.72);
+}
+
+.loom-list strong {
+  font-weight: 500;
+  color: #000;
+}
+
+/* A short numbered step list — bold digit + copy, same size/color as Body
+   text (rgba(0,0,0,.6) at 14px) rather than a browser-default ol marker,
+   so it reads as part of the paragraph flow above it, not a separate list
+   style. */
+.loom-numbered-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.loom-numbered-list li {
+  display: flex;
+  gap: 10px;
+  font-family: 'Switzer', 'Switzer Placeholder', sans-serif;
+  font-size: 14px;
+  line-height: 154%;
+  color: rgba(0, 0, 0, 0.6);
+}
+
+.loom-numbered-list__num {
+  flex: none;
+  font-weight: 400;
+  /* Same purple as the note card icon's stroke, right above this list. */
+  color: #8a5cf0;
+}
+
+/* ---------------------------------------------------------------- Trade-off */
+.loom-tradeoff {
+  width: 100%;
+  box-sizing: border-box;
+  background: #fafafa;
+  padding: 28px 24px;
+  margin-top: 40px;
+}
+
+/* --------------------------------------------------------- Viability toggle
+   Collapsed by default: it shows range without spending narrative on it. */
+
+/* #nextsteps uses align-items: flex-start, so without an explicit width this
+   group shrinks to the summary text (~250px) and the open body — lists and
+   canvas images — gets crushed to that measure. Stretch to the section. */
+.loom-collapse-group {
+  width: 100%;
+  align-self: stretch;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.loom-collapse {
+  width: 100%;
+  box-sizing: border-box;
+  /* 0.25px thinner than a standard 1px hairline (1px -> 0.75px). */
+  border-top: 0.75px solid rgba(0, 0, 0, 0.1);
+  border-bottom: 0.75px solid rgba(0, 0, 0, 0.1);
+  margin-top: 40px;
+}
+
+/* Back-to-back collapse items share the first item's bottom border as the
+   divider. Drop the second top border and zero its margin so each summary's
+   18px padding is the only space on either side of the line — equal above
+   and below. (A -16px margin used to cancel a parent flex gap; these now
+   live inside .loom-collapse-group with no gap, so that pull-up made the
+   lower title sit too close to the line.) */
+.loom-collapse + .loom-collapse {
+  border-top: none;
+  margin-top: 0;
+}
+
+/* No border framing the pair as a whole — just the one shared line between
+   them from the rule above. Scoped to .loom-collapse-group's own children
+   (not :first-of-type/:last-of-type on the page at large) since these are
+   now plain divs — .loom-collapse-group holds only the two collapse items,
+   so :first-child/:last-child unambiguously means "first/last of the pair"
+   regardless of what other divs sit elsewhere in the section. */
+.loom-collapse-group > .loom-collapse:first-child {
+  border-top: none;
+}
+
+.loom-collapse-group > .loom-collapse:last-child {
+  border-bottom: none;
+}
+
+.loom-collapse__summary {
+  width: 100%;
+  box-sizing: border-box;
+  cursor: pointer;
+  border: none;
+  background: none;
+  padding: 18px 0;
+  margin: 0;
+  font-family: 'Switzer', 'Switzer Placeholder', sans-serif;
+  font-size: 14px;
+  color: rgba(0, 0, 0, 0.72);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  text-align: left;
+}
+
+/* Single "+" glyph, rotated 45deg open instead of swapped for "–" — a
+   transform is animatable (and GPU-only) where a content swap isn't, so
+   this can turn into an "x" instead of just cutting between two glyphs.
+   Bars are shorter than the 16px box so a 45° rotate stays inside the same
+   footprint as the collapsed "+" (√2 growth would otherwise make the "x"
+   look larger). */
+.loom-collapse__icon {
+  margin-left: auto;
+  flex: none;
+  width: 16px;
+  height: 16px;
+  position: relative;
+  overflow: visible;
+  transform-origin: center center;
+  transition: transform 200ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+.loom-collapse__icon::before,
+.loom-collapse__icon::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  background: #595959;
+  transform: translate(-50%, -50%);
+}
+
+.loom-collapse__icon::before {
+  width: 11px;
+  height: 1.5px;
+}
+
+.loom-collapse__icon::after {
+  width: 1.5px;
+  height: 11px;
+}
+
+.loom-collapse.is-open .loom-collapse__icon {
+  transform: rotate(45deg);
+}
+
+.loom-collapse__body-wrap {
+  width: 100%;
+  height: 0;
+}
+
+.loom-collapse.is-open .loom-collapse__body-wrap {
+  height: auto;
+}
+
+.loom-collapse__body {
+  width: 100%;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding-bottom: 24px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .loom-collapse__icon {
+    transition: none;
+  }
+}
+
+/* ------------------------------------------------------------------- Links */
+/* Overview link row — same pill pair as Grumble, so the two case studies read
+   as one system. */
+.loom-links {
+  display: flex;
+  flex-flow: row wrap;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.loom-pill,
+a.loom-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  box-sizing: border-box;
+  border: 0.5pt solid rgb(0 0 0 / 0.15);
+  border-radius: 100px;
+  background: #fff;
+  color: rgba(0, 0, 0, 0.45);
+  font-family: 'Switzer', 'Switzer Placeholder', sans-serif;
+  font-size: 13px;
+  line-height: 120%;
+  text-decoration: none;
+  transition:
+    background-color 160ms ease,
+    color 160ms ease,
+    border-color 160ms ease;
+}
+
+/* Primary outbound pill — light blue fill, black text. */
+.loom-pill.loom-pill--filled,
+a.loom-pill.loom-pill--filled {
+  background: #e9f5fe;
+  border-color: #e9f5fe;
+  color: #000;
+}
+
+.loom-pill__arrow {
+  display: flex;
+  flex: none;
+  width: 12px;
+  height: 12px;
+  opacity: 0.7;
+  pointer-events: none;
+  transition: opacity 160ms ease;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .loom-pill:hover,
+  a.loom-pill:hover {
+    background: var(--selection-bg);
+    border-color: var(--selection-bg);
+    color: #000;
+  }
+
+  .loom-pill.loom-pill--filled:hover,
+  a.loom-pill.loom-pill--filled:hover {
+    background: #d6ecfc;
+    border-color: #d6ecfc;
+    color: #000;
+  }
+
+  .loom-pill:hover .loom-pill__arrow {
+    opacity: 1;
+  }
+
+  /* The two export pills stay contained on hover — no green fill, just the
+     text and icon going to full black, since the cursor-following "Open
+     Doc" label already carries the affordance these two need. */
+  .loom-pill--plain-hover:hover {
+    background: #fff;
+    border-color: rgb(0 0 0 / 0.15);
+    color: #000;
+  }
+}
+
+a.loom-pill:active {
+  transform: scale(0.97);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .loom-pill {
+    transition: none;
+  }
+}
+
+/* Section-closing line — the claim a reader should leave the section with. */
+.framer-pR67w .loom-closer p.framer-text {
+  color: rgba(0, 0, 0, 0.85);
+}
+
+/* "Skip to solution" jumps here, so the heading needs the same clearance the
+   other scroll targets get from casestudy.css. */
+.framer-pR67w #solution {
+  scroll-margin-top: 60px;
+}
+
+/* Media that sits directly under a text block — the Overview slot, the Problem
+   video — takes the shared case-study media-gap, the same air Grumble's
+   .grumble-reel gets below its intro copy. Both parents already contribute a
+   6px flex gap, so one rule keeps every text-to-media step identical. */
+.framer-pR67w .framer-3eslqg > .loom-slot,
+.framer-pR67w .loom-media {
+  margin-top: var(--case-study-media-gap);
+}
+
+/* Process reel ground — same #fafafa takeaway card token in light; night
+   overrides to the soft white panel in casestudy-dark.css. */
+.loom-process-reel {
+  background: #fafafa;
+}
+
+/* Overview media placeholder — plain #fafafa fill at the Solution video's
+   aspect ratio, rounded to read as a media block. */
+.loom-overview-placeholder {
+  background: #fafafa;
+  border-radius: 12px;
+}
+
+.loom-process-reel iframe {
+  background: transparent;
+}
+
+/* Inline folders mark after "place" in the HMW h1 — 1em so it matches the
+   20px title, sat on the same line, same treatment as Grumble's
+   .grumble-title-radio. */
+.loom-title-folders {
+  display: inline-flex;
+  vertical-align: -0.18em;
+  width: 1em;
+  height: 1em;
+  margin-inline: 0.16em;
+  color: currentColor;
+}
+
+.loom-title-folders svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* ------------------------------------------------------------- Title badges
+   One of the animated icons sitting to the left of a column title, bare —
+   no fill behind it, so the glyph reads as part of the heading rather than as
+   a button. Capped at 1.3em, the .insight-title line-height, so it never
+   grows taller than the text beside it. */
+/* Size and gap live on the column so the copy underneath can indent by exactly
+   the two combined — that's what puts the paragraph's first character on the
+   same left edge as the title's, rather than under the icon. */
+.loom-pair__col {
+  --loom-badge-size: 12.5px;
+  --loom-badge-gap: 8px;
+}
+
+.loom-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  box-sizing: border-box;
+  width: var(--loom-badge-size, 12.5px);
+  height: var(--loom-badge-size, 12.5px);
+  color: rgba(0, 0, 0, 0.72);
+}
+
+.loom-badge svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* Flex rather than vertical-align: the badge is a div inside the h4, and this
+   centres it against the cap height without magic offsets. */
+.insight-title--badged {
+  display: flex;
+  align-items: center;
+  gap: var(--loom-badge-gap, 8px);
+}
+
+.framer-pR67w .insight-title--badged + .framer-1sfabqy {
+  padding-left: calc(var(--loom-badge-size, 12.5px) + var(--loom-badge-gap, 8px));
+}
+
+/* Centered, muted caption under a real clip — same visual language as the
+   Overview video's .overview-video-caption. Tightened a few px from the
+   card's normal 12px flex gap, since a caption reads as part of the video
+   block rather than a fresh paragraph. */
+/* The site-wide 75ch reading measure caps every paragraph, which would centre
+   this against 605px instead of the video's full width — so the caption opts
+   out of the measure and centres against the clip it belongs to. */
+.framer-pR67w .framer-172orq5 p.loom-media-caption,
+#main p.loom-media-caption {
+  max-width: none;
+}
+
+.loom-media-caption {
+  margin: 0;
+  margin-top: -4px;
+  width: 100%;
+  text-align: center;
+  font-family: 'Switzer', 'Switzer Placeholder', sans-serif;
+  font-size: 14px;
+  line-height: 154%;
+  color: rgba(0, 0, 0, 0.6);
+}
+
+/* Extra air above the first sub-claim in a solution card, so it doesn't read
+   as glued to the card's main title above it. */
+/* p.framer-text carries margin:0 at (element + class) specificity, which
+   beats a bare class selector — match it so this wins instead of losing to
+   the reset. 4px on top of the card's 12px flex gap makes 16px total, the
+   same title-to-body gap Grumble's .grumble-intro-col uses. */
+p.loom-solution__lead {
+  margin-top: 4px;
+}
+
+/* ---------------------------------------------------------------- Note card
+   A callout with an illustration beside the copy — a stroke outline (not a
+   filled card) laid out as a row instead of a stack, so it reads as an
+   aside, not as one of the page's structural cards. */
+.loom-note-card {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  background: transparent;
+  border: 0.75px solid rgba(0, 0, 0, 0.13);
+  border-radius: 10px;
+  padding: 24px;
+  box-sizing: border-box;
+  width: 100%;
+  /* On top of the card's 12px flex gap — matches the media-gap token used
+     for text-to-media elsewhere, so a media block gets the same air on
+     both sides of it. */
+  margin-top: var(--case-study-media-gap);
+}
+
+/* 106px base, 25% smaller (-> ~79.5px) so the illustration doesn't dominate
+   the row next to the copy. */
+.loom-note-card__art {
+  flex: none;
+  width: 79.5px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.loom-note-card__body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+/* Small topic label above a note card's copy — same 14px as the body text
+   below it (this is a tag, not a heading), one weight step up (500 vs the
+   body's 400) and full black instead of the body's 60%-black, so it reads
+   as a label without competing with .insight-title's larger headings. */
+.loom-note-card__topic {
+  margin: 0;
+  font-family: 'Switzer', 'Switzer Placeholder', sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 130%;
+  color: #000;
+}
+
+/* Icon badge for a note card — fixed square + flex centering (not CSS
+   padding) is what keeps the icon equidistant from every edge of the
+   circle, left included, rather than needing left/right and top/bottom
+   padding values to be kept in sync by hand. */
+.loom-note-card__icon {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  background: #f5eeff;
+  color: #8a5cf0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* One-off: this note card sits directly under a heading with its own copy
+   right above it, so the standard 24px art-to-text gap reads as too loose —
+   tightened just here rather than for every .loom-note-card. Icon-to-text
+   gap taken down another 49% then a further 25% (12px -> 6px -> 4.5px), and
+   the card's left padding 40% off the base 24px then another 25%
+   (-> 14px -> 10.5px) so the icon sits closer to the card's left edge —
+   top/right/bottom padding untouched. */
+.loom-note-card--tight {
+  gap: 2.8px;
+  padding-left: 5.25px;
+  /* Centers the banner in the space between the caption above it (32px,
+     the base .loom-note-card margin-top) and "Landing on the final
+     solution" below it (124px, .loom-stack--gap, overridden to match on
+     that element directly) — midpoint of 32/124 is 78. */
+  margin-top: 78px;
+}
+
+/* Base .loom-note-card__art is already 79.5px (25% off 106px) — this one
+   goes further, down to 78px, since with just the 50px icon circle in it
+   (not the larger sync-mark SVG the other note card uses) even that still
+   left more cushion than this tighter card wants. */
+.loom-note-card--tight .loom-note-card__art {
+  width: 78px;
+}
+
+@media (max-width: 1199.98px) {
+  .loom-note-card {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
+  }
+}
+
+/* -------------------------------------------------------------- Hub sync art
+   Nothing changes position: each rail's dashes brighten in turn from the tool
+   end inward, and the folder gives a little as the charge lands. The pulse
+   spans exactly the 28% of the cycle the travelling head does not use, so one
+   head fires as the previous tail dies and the chase never rests. */
+.loom-sync {
+  --loom-sync-dur: 1.8s;
+  --loom-sync-dim: 0.24;
+  --loom-sync-travel: 0.72;
+  --loom-sync-squash: 0.94;
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.loom-sync image {
+  clip-path: inset(0 round 2px);
+}
+
+.loom-sync__dash {
+  stroke: #3d91fe;
+  stroke-width: 6;
+  stroke-linecap: round;
+  opacity: var(--loom-sync-dim);
+  animation: loom-sync-glow var(--loom-sync-dur) linear infinite;
+  animation-delay: calc(var(--loom-sync-dur) * var(--p) * var(--loom-sync-travel));
+}
+
+@keyframes loom-sync-glow {
+  0% {
+    opacity: var(--loom-sync-dim);
+  }
+  7% {
+    opacity: 1;
+    animation-timing-function: cubic-bezier(0.25, 0, 0.55, 1);
+  }
+  28% {
+    opacity: var(--loom-sync-dim);
+  }
+  100% {
+    opacity: var(--loom-sync-dim);
+  }
+}
+
+/* Only the white folder reacts — the blue disc never changes size. fill-box
+   centres the scale on the glyph itself, which sits on the disc's centre. */
+.loom-sync__glyph {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: loom-sync-receive var(--loom-sync-dur) infinite;
+}
+
+@keyframes loom-sync-receive {
+  0%,
+  55% {
+    transform: scale(1);
+    animation-timing-function: cubic-bezier(0.42, 0, 0.42, 1);
+  }
+  78% {
+    transform: scale(var(--loom-sync-squash));
+    animation-timing-function: cubic-bezier(0.32, 0.4, 0.3, 1);
+  }
+  92% {
+    transform: scale(1.012);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .loom-sync__dash,
+  .loom-sync__glyph {
+    animation: none;
+  }
+  /* Without the chase, the rails would read as a broken line at 24% — hold
+     them at full strength instead so the connection still reads. */
+  .loom-sync__dash {
+    opacity: 0.55;
+  }
+}
+
+/* ------------------------------------------------------------ PDF preview
+   The two export artifacts Solution 05 promises, opened in-page instead of a
+   new tab — just the PDF itself over a blurred, dimmed backdrop, no chrome
+   around it. z-index sits above the cursor-follow pill (99990) so it wins if
+   both are somehow active at once. */
+.loom-pdf-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100000;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px;
+  box-sizing: border-box;
+}
+
+.loom-pdf-panel {
+  position: relative;
+  width: min(720px, 100%);
+  height: min(90vh, 960px);
+}
+
+/* Floats just outside the frame's corner rather than inside a header bar,
+   since the PDF's own viewer chrome is the only "header" this gets. */
+.loom-pdf-panel__close {
+  position: absolute;
+  top: 0;
+  right: -48px;
+  z-index: 1;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 50%;
+  background: #fff;
+  color: rgba(0, 0, 0, 0.7);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25);
+  cursor: pointer;
+  transition: background-color 160ms ease, color 160ms ease;
+}
+
+.loom-pdf-panel__close:hover {
+  background: #f2f2f2;
+  color: #000;
+}
+
+.loom-pdf-panel__frame {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: #fff;
+  /* The PDF itself supplies scrolling — the frame just fills the panel. */
+}
+
+/* Leading icon on the export pills, same slot the arrow used to sit in. */
+.loom-pill__icon {
+  display: flex;
+  flex: none;
+  width: 14px;
+  height: 14px;
+  pointer-events: none;
+}
+
+/* ------------------------------------------------------------- Module pair
+   Two evaluation-module screenshots side by side (Solution 04), each with
+   its own centered caption underneath — same treatment as .loom-media-caption,
+   just per-column instead of full-width. Sits inside the standard #fafafa
+   card token — sharp corners, no border, same surface every other card on
+   the page uses. */
+.loom-module-frame {
+  background: none;
+  border: 0.5px solid rgba(0, 0, 0, 0.1);
+  padding: 60px 40px;
+  box-sizing: border-box;
+  width: 100%;
+}
+
+.loom-module-row {
+  display: flex;
+  gap: 16px;
+  /* 20% smaller than the frame's own content box, centered in the leftover
+     space rather than touching the padding on every side. */
+  width: 80%;
+  margin: 0 auto;
+  box-sizing: border-box;
+}
+
+/* Full-width variant — for a module row that isn't inside a padded
+   .loom-module-frame and shouldn't shrink (e.g. the Process step images). */
+.loom-module-row--full {
+  width: 100%;
+  margin: 0;
+}
+
+.loom-module-col {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.loom-module-col img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+/* Stays a side-by-side row at every width, as on desktop. On a phone the
+   frame's 60/40 padding and 80% inner width would leave each card ~130px, so
+   they tighten there. */
+@media (max-width: 700px) {
+  .loom-module-frame {
+    padding: 32px 16px;
+  }
+
+  .loom-module-row {
+    width: 100%;
+    gap: 12px;
+  }
+}
+
+/* ------------------------------------------------------------- Video row
+   Two clips side by side at equal height, gap 16px, each keeping its own
+   aspect ratio — the "flex-grow = own ratio" justified-row trick, so a
+   landscape and a portrait clip line up cleanly without either cropping.
+   The row itself carries the single text→media gap; the individual
+   .loom-media rule's margin-top is reset per child so it doesn't stack. */
+.loom-video-row {
+  display: flex;
+  align-items: stretch;
+  gap: 16px;
+  width: 100%;
+  margin-top: var(--case-study-media-gap);
+}
+
+.loom-video-row > .loom-media {
+  margin-top: 0;
+}
+
+/* Stays one horizontal row at every width — the inline flex-grow ratios keep
+   the landscape and portrait clips at equal height, as on desktop. */
+@media (max-width: 700px) {
+  .loom-video-row {
+    gap: 12px;
+  }
+}

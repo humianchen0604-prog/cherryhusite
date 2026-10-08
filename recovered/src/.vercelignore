@@ -1,0 +1,15 @@
+.next
+node_modules
+.env
+.env.local
+.env*.local
+docs
+.agents
+.claude
+$SP
+.DS_Store
+*.tsbuildinfo
+scripts
+public/assets/external
+public/**/*.mov
+_archive

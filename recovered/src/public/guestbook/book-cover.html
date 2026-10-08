@@ -1,0 +1,3888 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Guestbook</title>
+  <!-- The open spread is drawn in CSS (see "CODED OPEN SPREAD"), so only the
+       two hard covers are bitmaps worth preloading. -->
+  <link rel="preload" as="image" href="Assets/Images/Cover.png?v=1789859770" />
+  <link rel="preload" as="image" href="Assets/Images/Back.png?v=1785618989" />
+  <meta name="guestbook-cloud" content="auto" />
+  <script src="vendor/page-flip.browser.js"></script>
+  <script src="js/notePlacement.js"></script>
+  <script src="js/profanityFilter.js"></script>
+  <script src="js/guestbookApi.js?v=20260921-persist"></script>
+  <style>
+    @font-face {
+      font-family: 'Ugly Dave';
+      src: url('Assets/Fonts/ugly-dave/ugly-dave.woff2') format('woff2'),
+           url('Assets/Fonts/ugly-dave/ugly-dave.woff') format('woff');
+      font-weight: normal;
+      font-style: normal;
+      font-display: swap;
+    }
+
+    @font-face {
+      font-family: 'Switzer';
+      src: url('Assets/Fonts/switzer/Switzer-Regular.otf') format('opentype');
+      font-weight: 400;
+      font-style: normal;
+      font-display: swap;
+    }
+
+    @font-face {
+      font-family: 'Switzer';
+      src: url('Assets/Fonts/switzer/Switzer-Medium.otf') format('opentype');
+      font-weight: 500;
+      font-style: normal;
+      font-display: swap;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body { height: 100%; }
+
+    body {
+      background: #ffffff;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: clamp(20px, 3.5vh, 36px);
+      padding: 28px 16px 40px;
+      overflow: hidden;
+      -webkit-font-smoothing: antialiased;
+      font-family: 'Ugly Dave', cursive, sans-serif;
+    }
+
+    /*
+     * Frost scrim — lighter/airier than envelope dark gray
+     * (blur still matches About me: blur(14px) saturate(1.05))
+     * Soft warm gray-cream tint — more presence than a cream wash,
+     * lighter than the original heavy gray dim.
+     * Click dismisses like the envelope frost overlay.
+     *
+     * Full blur always on the layer; opacity 0→1 reads as
+     * “blur fading in” and overlaps the cover flip-open (~600ms).
+     */
+    .frost-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 1;
+      opacity: 0;
+      pointer-events: none;
+      background: linear-gradient(
+        180deg,
+        rgba(60, 55, 52, 0.10) 0%,
+        rgba(40, 38, 36, 0.14) 100%
+      );
+      backdrop-filter: blur(21px) saturate(1.05);
+      -webkit-backdrop-filter: blur(21px) saturate(1.05);
+      will-change: opacity;
+      /* Exit: ~25% faster than enter (base state = leaving .is-active) */
+      transition: opacity var(--modal-exit) var(--modal-ease);
+      cursor: pointer;
+    }
+
+    .frost-overlay.is-active {
+      opacity: 1;
+      pointer-events: auto;
+      /* Enter: fades across the start of the cover flip */
+      transition: opacity var(--modal-enter) var(--modal-ease);
+    }
+
+    /* ── Stage ────────────────────────────────────────────────
+       Fixed footprint = open spread (2 × page). Spine stays at
+       horizontal center for closed cover AND open PageFlip, so
+       open/close never shifts the book’s visual center.
+       Sits above the frost so the book stays sharp.
+       Clip when settled-open; stay visible while cover flaps so
+       the hard cover isn’t trimmed by the stage box.
+       ──────────────────────────────────────────────────────── */
+    #stage {
+      position: relative;
+      z-index: 2;
+      width: calc(var(--book-w) * 2);
+      height: var(--book-h);
+      flex-shrink: 0;
+      /* Closed book 3D peek can extend slightly; clip only once open */
+      overflow: visible;
+    }
+
+    body.is-book-open #stage {
+      overflow: hidden;
+      border-radius: 20px;
+    }
+
+    /* Cover flap open/close — let hard cover swing past spine into frost */
+    body.is-cover-flipping #stage {
+      overflow: visible !important;
+    }
+
+    /*
+     * OPEN STAGING — split open-spread art under #book.
+     * Left 50% OpenNotebookLeft + right 50% OpenNotebookRight, 0 gap.
+     * Inside #book-wrapper so the hard cover curls over it and it never
+     * peeks beside the closed CSS cover.
+     * Visible while opening and while landed (is-notebook).
+     * On close-to-cover: hide left immediately (is-hiding-left) so the
+     * cover flap isn’t fighting the left bg.
+     */
+    #open-staging {
+      position: absolute;
+      inset: 0;
+      z-index: 0;
+      pointer-events: none;
+      opacity: 0;
+      visibility: hidden;
+    }
+
+    body.is-book-opening #open-staging,
+    #book-wrapper.is-notebook #open-staging {
+      opacity: 1;
+      visibility: visible;
+    }
+
+    /* Left half — OpenNotebookLeft (shown on land; cleared on close-to-cover) */
+    .open-left-page-bg {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 50%;
+      height: 100%;
+      /* The cover board the sheets sit on. */
+      background-color: #FF53C4;
+      /* Match cover outer radius */
+      border-radius: var(--cover-radius) 0 0 var(--cover-radius);
+      overflow: hidden;
+      opacity: 0;
+      visibility: hidden;
+    }
+
+    /*
+     * Landed open spread only.
+     *
+     * Nothing is painted on the left while the cover is still shut: a closed
+     * book has nothing beside its cover, and pre-painting the left page there
+     * made a cream leaf appear next to the cover before it had even begun to
+     * turn. The cover IS the left page — it carries a cream verso, so it turns
+     * onto paper and hands over to this one on landing without a colour
+     * change. Pulled again on the way out, so the closing flap has a clear
+     * left half to land on.
+     */
+    #book-wrapper.is-notebook:not(.is-hiding-left) .open-left-page-bg {
+      opacity: 1;
+      visibility: visible;
+    }
+
+    /* Right half — OpenNotebookRight (webp preferred; png via JS) */
+    .open-right-page-bg {
+      position: absolute;
+      top: 0;
+      left: 50%;
+      width: 50%;
+      height: 100%;
+      background-color: #FF53C4;
+      border-radius: 0 20px 20px 0;
+      overflow: hidden;
+    }
+
+    /*
+     * ── CODED OPEN SPREAD ────────────────────────────────────────────────
+     * Draws what OpenNotebookLeft/Right.webp used to: each half is the pink
+     * cover board carrying a stack of sheets. Every sheet below the top page
+     * is nudged towards the fore-edge, so the sliver of each one that escapes
+     * the page above it lines up into the page block's edge — the same banding
+     * the art had, but as real layers that shadow each other.
+     *
+     * Proportions are measured off the originals (2046x2639 per half): the
+     * cover overhangs 3.85% of a half's width at the fore-edge, 0.95% of its
+     * height above and 0.8% below, and the fore-edge band is ~3.4% wide.
+     *
+     * Drawn rather than decoded, so the spread is there on the first frame of
+     * the cover flip instead of arriving after it.
+     */
+    .paper-stack {
+      position: absolute;
+      /* Top page's own box. The cover shows past it above and below; the sheets
+         below fan out past it towards the fore-edge. */
+      top: 1.3%;
+      bottom: 1.7%;
+      z-index: 0;
+      pointer-events: none;
+    }
+
+    /* Fore-edge inset = cover overhang (3.85% / 3.9%) plus the band the stack's
+       own edge fills (3.4% left, 2.6% right — the art is not quite symmetric). */
+    .open-left-page-bg .paper-stack { left: 7.3%; right: 0; }
+    .open-right-page-bg .paper-stack { right: 6.5%; left: 0; }
+
+    /*
+     * One sheet under the top page; --i is how deep it sits. Deeper sheets
+     * stand slightly further out and slightly taller, which is what puts a
+     * sliver of each along the fore-edge and a hairline along top and bottom.
+     * The leading edge of each is drawn into its own background so the seam
+     * stays a crisp sub-pixel line at any size.
+     */
+    .paper-sheet {
+      position: absolute;
+      top: calc(var(--i) * -0.0215%);
+      bottom: calc(var(--i) * -0.0215%);
+    }
+
+    .open-left-page-bg .paper-sheet {
+      right: 0;
+      left: calc(var(--i) * -0.26%);
+      border-radius: 12px 0 0 12px;
+      background: linear-gradient(
+        90deg,
+        rgba(86, 68, 62, 0.34) 0 0.75px,
+        #F2EDE7 0.75px
+      );
+    }
+
+    .open-right-page-bg .paper-sheet {
+      left: 0;
+      right: calc(var(--i) * -0.195%);
+      border-radius: 0 12px 12px 0;
+      background: linear-gradient(
+        270deg,
+        rgba(86, 68, 62, 0.34) 0 0.75px,
+        #F2EDE7 0.75px
+      );
+    }
+
+    /*
+     * The first page is glued to the inside of the cover, so it comes over
+     * with it as one panel instead of being a separate leaf that turns after.
+     * See .cover-verso below.
+     */
+
+    @media (prefers-reduced-motion: reduce) {
+    }
+
+    /* The page being read — hides all but the edge of the stack under it. */
+    .paper-top {
+      position: absolute;
+      inset: 0;
+      background: #FCF9F5;
+      /* The dark seam where the block meets the cover beneath it. */
+      box-shadow: 0 2.5px 3px rgba(48, 34, 32, 0.4);
+    }
+
+    .open-left-page-bg .paper-top { border-radius: 12px 0 0 12px; }
+    .open-right-page-bg .paper-top { border-radius: 0 12px 12px 0; }
+
+    /* ══════════════════════════════════════════════════════════
+       CLOSED PHASE — Vault CSS 3D book (hover peek only)
+       Sized to match one PageFlip page; parked on the RIGHT half
+       of the stage (same as StPageFlip showCover cover).
+       ══════════════════════════════════════════════════════════ */
+    :root {
+      /* Defaults; JS overwrites to stay in sync with PageFlip */
+      --book-w: 320px;
+      --book-h: 425px;
+      /* Page-block thickness (Framer ref ≈ 28px between covers) */
+      --book-depth: 28px;
+      /*
+       * Front-cover outer corner radius (spine side stays 0).
+       * Closed CSS was 8px · PageFlip hard front was 20px · both ×1.4.
+       */
+      --cover-radius: 28px;
+      --cover-radius-closed: 11.2px;
+      --page-x: 0deg;
+      --page-y: 38deg;
+      --page-z: 0deg;
+      --page-tx: -21px;
+      --page-ty: 0px;
+      --page-tz: 6px;
+      /* Frost fades during cover flip-open; exit ~25% faster */
+      --modal-ease: cubic-bezier(0.23, 1, 0.32, 1);
+      --modal-enter: 400ms;
+      --modal-exit: 195ms;
+      /*
+       * Message input: fade begins at 50% of frost enter.
+       * delay = 400ms × 0.5 = 200ms (wired in JS as INPUT_SHOW_DELAY_MS).
+       */
+      /* 220ms -> 286ms (30% slower), then 150ms off. Exit is unchanged. */
+      --input-fade: 136ms;
+      --input-exit: 140ms;
+      --input-ease: cubic-bezier(0.23, 1, 0.32, 1);
+    }
+
+    .book-wrap {
+      position: absolute;
+      inset: 0;
+      perspective: 1200px;
+      perspective-origin: 50% 50%;
+      z-index: 2;
+      transition: opacity 0.28s ease, visibility 0.28s ease;
+    }
+
+    /* In-plane tilt for the closed book, on top of its rotateY peek. The rest and
+       hover states both carry it, so hovering only turns the cover -- the tilt
+       itself never moves. Centre origin, so the book leans in place rather than
+       swinging about its spine. Open state is unaffected: the wrapper is hidden
+       once PageFlip takes over. */
+    .book-wrap.is-closed {
+      transform: rotate(5deg);
+      transform-origin: 50% 50%;
+    }
+
+    .book-wrap.is-hidden {
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+      /* Instant handoff to PageFlip enter — no fade lag behind frost */
+      transition: none;
+    }
+
+    .book {
+      /* Spine at stage center — matches PageFlip cover (right page) */
+      position: absolute;
+      left: 50%;
+      top: 0;
+      width: var(--book-w);
+      height: var(--book-h);
+      transform-style: preserve-3d;
+      transform-origin: left center;
+      transform: rotateX(0deg) rotateY(-10deg);
+      transition: transform 0.7s cubic-bezier(0.23, 1, 0.32, 1);
+      cursor: pointer;
+    }
+
+    /* No ring: closing refocuses the book, and a flat outline on a 3D-rotated
+       element draws as a stray pink frame. The focus peek (flap open) below
+       still marks keyboard focus. */
+    .book:focus-visible {
+      outline: none;
+    }
+
+    .book-back {
+      position: absolute;
+      inset: 0;
+      /* Flat back colour; the Book Back art is no longer used here. */
+      background: #DF3EAB;
+      /* Same outer corners as the front cover (spine left stays square). */
+      border-radius: 0 var(--cover-radius-closed) var(--cover-radius-closed) 0;
+      transform: translateZ(calc(var(--book-depth) * -1));
+      /* Hairline same-colour rim softens 3D raster “毛边” on the rotated edge. */
+      outline: 1px solid #DF3EAB;
+      outline-offset: -0.5px;
+      backface-visibility: hidden;
+      -webkit-backface-visibility: hidden;
+      box-shadow:
+        0 28px 70px rgba(0,0,0,0.18),
+        0 10px 28px rgba(0,0,0,0.12),
+        0 0 0 0.75px #DF3EAB;
+    }
+
+    /*
+     * Page block — Framer-inspired inner volume:
+     * cream stack between covers, striped fore-edge + top edge,
+     * and a few shelf faces so the closed book reads as many pages.
+     * Does not alter .book / .book-cover rotation angles.
+     */
+    .book-pages {
+      position: absolute;
+      top: 7px;
+      bottom: 7px;
+      left: 3px;
+      /* Stay inside the cover's outer radius so cream pages never peek
+         past the rounded right edge at rest. */
+      right: 12px;
+      transform-style: preserve-3d;
+      pointer-events: none;
+    }
+
+    /* Closed at rest: no page-block fringe behind the cover. Hover/focus
+       brings the stack back as the cover flaps open. */
+    .book-wrap.is-closed .book:not(:hover):not(:focus-visible):not(.is-peek) .book-pages {
+      opacity: 0;
+    }
+
+    /* Closed at rest there is no stroke round the book: the back board's rim
+       goes and it keeps only its drop shadow. Both come back once the cover
+       turns, when the back board is what shows behind it. */
+    .book-wrap.is-closed .book:not(:hover):not(:focus-visible):not(.is-peek) .book-back {
+      background: transparent;
+      outline-color: transparent;
+      box-shadow:
+        0 28px 70px rgba(0,0,0,0.18),
+        0 10px 28px rgba(0,0,0,0.12);
+    }
+
+    .book-pages-front {
+      position: absolute;
+      inset: 0;
+      border-radius: 1px 5px 5px 1px;
+      background:
+        linear-gradient(90deg, #E359B4 0%, #FDF8F6 38%, #F7F0EC 100%);
+      transform: translateZ(-2px);
+      box-shadow:
+        inset 5px 0 12px rgba(212, 0, 139, 0.14),
+        inset -2px 0 6px rgba(0, 0, 0, 0.04);
+    }
+
+    /* Stacked sheet faces — subtle shelves between cover and back */
+    .book-pages-shelf {
+      position: absolute;
+      top: 1px;
+      bottom: 1px;
+      left: 0;
+      right: 0;
+      border-radius: 1px 4px 4px 1px;
+      background: linear-gradient(90deg, #EA80C5 0%, #FDF8F6 55%, #F5EEE9 100%);
+      box-shadow: 0 0 0 0.5px rgba(212, 0, 139, 0.35);
+      transform: translateZ(var(--shelf-z));
+    }
+
+    .book-pages-shelf:nth-child(2) { --shelf-z: -7px;  opacity: 0.95; }
+    .book-pages-shelf:nth-child(3) { --shelf-z: -13px; opacity: 0.9; }
+    .book-pages-shelf:nth-child(4) { --shelf-z: -19px; opacity: 0.85; }
+    .book-pages-shelf:nth-child(5) { --shelf-z: -24px; opacity: 0.8; }
+
+    /* Fore-edge (right) — page lines / layered paper block */
+    .book-pages-edge {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      left: 100%;
+      width: var(--book-depth);
+      transform-origin: left center;
+      transform: rotateY(90deg);
+      border-radius: 0 1px 1px 0;
+      background-color: #F7F0EC;
+      background-image:
+        linear-gradient(
+          90deg,
+          rgba(212, 0, 139, 0.14) 0%,
+          transparent 14%,
+          transparent 86%,
+          rgba(0, 0, 0, 0.07) 100%
+        ),
+        repeating-linear-gradient(
+          90deg,
+          #FDF8F6 0px,
+          #FDF8F6 1.6px,
+          #E8DDD6 1.6px,
+          #E8DDD6 2.6px
+        );
+      box-shadow: inset 0 0 8px rgba(212, 0, 139, 0.1);
+    }
+
+    /* Top edge — same cream page-stack cue from above */
+    .book-pages-top {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 100%;
+      height: var(--book-depth);
+      transform-origin: center bottom;
+      transform: rotateX(90deg);
+      background-color: #F7F0EC;
+      background-image:
+        linear-gradient(180deg, rgba(0, 0, 0, 0.06) 0%, transparent 35%),
+        repeating-linear-gradient(
+          180deg,
+          #FDF8F6 0px,
+          #FDF8F6 1.6px,
+          #E8DDD6 1.6px,
+          #E8DDD6 2.6px
+        );
+    }
+
+    .book-cover {
+      position: absolute;
+      inset: 0;
+      transform-origin: left center;
+      transform-style: preserve-3d;
+      transform: rotateY(0deg);
+      transition: transform 0.7s cubic-bezier(0.23, 1, 0.32, 1);
+      /* Spine left (square) · outer right rounded */
+      border-radius: 0 var(--cover-radius-closed) var(--cover-radius-closed) 0;
+    }
+
+    .book-cover-face {
+      position: absolute;
+      inset: 0;
+      border-radius: 0 var(--cover-radius-closed) var(--cover-radius-closed) 0;
+      overflow: hidden;
+      backface-visibility: hidden;
+      -webkit-backface-visibility: hidden;
+      /* No rim, outline or inner shadow here. Cover.png carries its own rounded
+         corners (~17px at this size, vs the box's 11.2px) and a hairline
+         transparent strip down its right edge, so anything drawn on this box
+         showed as a stray stroke outside the art when the cover turned: the
+         outline/ring off its corners, the inset shadow through the strip. */
+    }
+
+    .book-cover-face img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+      border-radius: 0 var(--cover-radius-closed) var(--cover-radius-closed) 0;
+    }
+
+    .book-cover-inner {
+      position: absolute;
+      inset: 0;
+      /* Open / flipping cover verso — lighter pink than closed peek */
+      background: #FF53C4;
+      /* Same cover board shape in local space (spine at left) */
+      border-radius: 0 var(--cover-radius-closed) var(--cover-radius-closed) 0;
+      backface-visibility: hidden;
+      -webkit-backface-visibility: hidden;
+      transform: rotateY(180deg);
+    }
+
+    .book-right-page {
+      position: absolute;
+      /* One plain rectangle, full cover height, same outer radius as the cover. */
+      top: 0;
+      left: var(--book-w);
+      width: 24px;
+      height: var(--book-h);
+      transform-origin: left center;
+      /* Match front cover outer radius so the hover flap lines up. */
+      border-radius: 0 var(--cover-radius-closed) var(--cover-radius-closed) 0;
+      /* No overflow clip: the flap has no children, and overflow:hidden + radius
+         on a 3D-rotated layer is what rasterised its edges jagged. A hairline
+         same-colour shadow gives the rotated edge an antialiased rim instead. */
+      background: #D4008B;
+      box-shadow: 0 0 0 0.75px #D4008B;
+      backface-visibility: hidden;
+      -webkit-backface-visibility: hidden;
+      will-change: transform;
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .book-shadow {
+      position: absolute;
+      bottom: -14px;
+      left: 10%;
+      width: 80%;
+      height: 28px;
+      background: radial-gradient(ellipse at center, rgba(0,0,0,0.10) 0%, transparent 70%);
+      filter: blur(12px);
+      transform: rotateX(90deg) translateZ(calc(var(--book-depth) * -1));
+      pointer-events: none;
+    }
+
+    /* Vault hover peek — only while closed (not opening/open).
+       Modest flap so more of the back reads without over-opening. */
+    .book-wrap.is-closed .book:hover,
+    .book-wrap.is-closed .book:focus-visible,
+    .book-wrap.is-closed .book.is-peek {
+      transform: rotateX(0deg) rotateY(-26deg);
+    }
+
+    .book-wrap.is-closed .book:hover .book-cover,
+    .book-wrap.is-closed .book:focus-visible .book-cover,
+    .book-wrap.is-closed .book.is-peek .book-cover {
+      transform: rotateY(-16deg);
+    }
+
+    .book-wrap.is-closed .book:hover .book-right-page,
+    .book-wrap.is-closed .book:focus-visible .book-right-page,
+    .book-wrap.is-closed .book.is-peek .book-right-page {
+      opacity: 1;
+      background: #D4008B;
+      transform:
+        rotateX(var(--page-x))
+        rotateY(var(--page-y))
+        rotateZ(var(--page-z))
+        translate3d(var(--page-tx), var(--page-ty), var(--page-tz));
+      transition: transform 0.2s cubic-bezier(0.23, 1, 0.32, 1),
+                  opacity 0.2s ease;
+    }
+
+    /* ══════════════════════════════════════════════════════════
+       OPEN PHASE — StPageFlip guestbook
+       Same stage box as the closed book (2 × page). No extra
+       width/centering so the spine stays put across the swap.
+       Face-on flat spread (no residual rotateY / book tilt).
+       Enter: instant show on cover (no scale) → PageFlip flipNext.
+       Exit: brief opacity fade after cover flip lands, then CSS book.
+       ══════════════════════════════════════════════════════════ */
+    #book-wrapper {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+      z-index: 1;
+      /* Contain PageFlip curl within the book footprint (guestbook pattern) */
+      overflow: hidden;
+      border-radius: 20px;
+      perspective: none;
+      will-change: opacity;
+      /* Exit only — open motion is the cover flip, not a scale/fade */
+      transition:
+        opacity var(--modal-exit) var(--modal-ease),
+        visibility var(--modal-exit);
+    }
+
+    #book-wrapper.is-visible {
+      opacity: 1;
+      visibility: visible;
+      /*
+       * Only the book itself takes clicks (see #book below). The wrapper is
+       * inset:0, so with pointer-events:auto it swallowed every click in the
+       * empty space around the book - including under the message bar, where
+       * elementFromPoint returned #book-wrapper rather than the frost. Those
+       * clicks never reached the frost's dismiss handler, so the host was
+       * never told the book was closing and it went home late and
+       * uncoordinated instead of shrinking into its slot. Clicks further out
+       * to the left and right missed the wrapper and closed it correctly,
+       * which is where the asymmetry came from.
+       */
+      pointer-events: none;
+      z-index: 3;
+      /* Instant appear at cover; flipNext is the open animation */
+      transition: none;
+    }
+
+    /*
+     * is-notebook = landed open spread (split halves live on #open-staging).
+     * No full Open Notebook.webp on wrapper/#book — halves are the bg.
+     */
+    #book-wrapper.is-notebook {
+      background-image: none;
+    }
+
+    #book-wrapper.is-visible #book {
+      pointer-events: auto;
+    }
+
+    #book {
+      position: relative;
+      /* Above #open-staging — the static halves AND the leaves turning with the
+         cover. The hard cover is the outermost surface of the book, so it is
+         the last layer: nothing inside the block may paint over it. */
+      z-index: 2;
+      width: 100%;
+      height: 100%;
+      background: transparent;
+      border-radius: 20px;
+      overflow: hidden;
+      transform: translateZ(0);
+    }
+
+    /*
+     * Offscreen paint of both open-spread halves — forces decoded bitmaps
+     * at display resolution before first open.
+     */
+    #notebook-paint-warm {
+      position: fixed;
+      left: -9999px;
+      top: 0;
+      display: flex;
+      width: min(92vw, 900px);
+      height: min(72vh, 640px);
+      opacity: 0;
+      pointer-events: none;
+      z-index: -1;
+    }
+
+    #notebook-paint-warm .warm-left,
+    #notebook-paint-warm .warm-right {
+      flex: 1 1 50%;
+      width: 50%;
+      height: 100%;
+      background-size: 100% 100%;
+      background-repeat: no-repeat;
+      background-position: center;
+    }
+
+    /* Nothing to pre-decode now that the spread is drawn in CSS; the node is
+       kept so the rest of the open sequence keeps its element. */
+    #notebook-paint-warm .warm-left {
+      background-color: #FF53C4;
+      border-radius: var(--cover-radius) 0 0 var(--cover-radius);
+      overflow: hidden;
+    }
+
+    #notebook-paint-warm .warm-right {
+      background-color: #FF53C4;
+    }
+
+    /* PageFlip parent fills the fixed stage — no autosize reflow */
+    #book.stf__parent,
+    #book .stf__wrapper {
+      position: relative;
+      display: block;
+      box-sizing: border-box;
+      width: 100% !important;
+      height: 100% !important;
+      max-width: none !important;
+      min-width: 0 !important;
+      min-height: 0 !important;
+      padding-bottom: 0 !important;
+      overflow: hidden !important;
+      border-radius: 20px;
+      transform: translateZ(0);
+      background: transparent !important;
+    }
+
+    #book .stf__block {
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      box-sizing: border-box;
+      perspective: 2000px;
+      /* No overflow clip on perspective node — wrappers above contain paint */
+      border-radius: 20px;
+      /* Keep transparent so #open-staging (spine + right page) shows through */
+      background: transparent !important;
+    }
+
+    #book .stf__item {
+      display: none;
+      position: absolute;
+      transform-style: preserve-3d;
+    }
+
+    /*
+     * Kill PageFlip's gray slab / hard shadow bars. The soft inner/outer
+     * shadows stay on: they are anchored to the moving fold, so the curl reads
+     * darkest where the paper bends and fades out toward the lifted corner.
+     */
+    #book .stf__hardShadow,
+    #book .stf__hardInnerShadow {
+      display: none !important;
+      opacity: 0 !important;
+      visibility: hidden !important;
+      pointer-events: none !important;
+      background: none !important;
+      filter: none !important;
+    }
+
+    /* While cover flaps — do not clip the swinging hard cover */
+    body.is-cover-flipping #book-wrapper,
+    body.is-cover-flipping #book,
+    body.is-cover-flipping #book.stf__parent,
+    body.is-cover-flipping #book .stf__wrapper {
+      overflow: visible !important;
+    }
+
+    .page {
+      background: transparent;
+      overflow: hidden;
+      position: relative;
+      backface-visibility: hidden;
+      -webkit-backface-visibility: hidden;
+      transform-style: preserve-3d;
+    }
+    .page.--left  { border-radius: 20px 0 0 20px; }
+    .page.--right { border-radius: 0 20px 20px 0; }
+    .page[data-density="hard"] { border-radius: 20px; background: #FDF8F6; }
+
+    /*
+     * Hard cover = two faces (matches CSS .book-cover / .book-cover-inner).
+     * PageFlip sets backface-visibility:hidden inline on the page — override
+     * so the pink verso is visible when the cover rotates past 90°.
+     */
+    .page.page--hard-cover {
+      background: transparent !important;
+      overflow: visible !important;
+      backface-visibility: visible !important;
+      -webkit-backface-visibility: visible !important;
+      transform-style: preserve-3d !important;
+    }
+
+    .page.page--hard-cover .cover-front,
+    .page.page--hard-cover .cover-verso {
+      position: absolute;
+      inset: 0;
+      backface-visibility: hidden;
+      -webkit-backface-visibility: hidden;
+    }
+
+    /*
+     * Front cover (closed / right half): square on spine (LEFT),
+     * radius only on outer RIGHT — 0 var(--cover-radius) var(--cover-radius) 0.
+     */
+    .page.page--hard-front,
+    .page.page--hard-front[data-density="hard"] {
+      border-radius: 0 var(--cover-radius) var(--cover-radius) 0;
+    }
+
+    .page.page--hard-front .cover-front {
+      overflow: hidden;
+      background: #FDF8F6;
+      border-radius: 0 var(--cover-radius) var(--cover-radius) 0;
+    }
+
+    .page.page--hard-front .cover-front .cover-img,
+    .page.page--hard-front .cover-front .cover-placeholder {
+      border-radius: 0 var(--cover-radius) var(--cover-radius) 0;
+    }
+
+    .page.page--hard-cover .cover-verso {
+      /*
+       * Cover board. The page is stuck to it (::after) rather than following
+       * as a loose leaf, so the whole panel — board plus paper — swings over
+       * together and already matches the settled left half when it lands.
+       */
+      background: #FF53C4 !important;
+      background-image: none !important;
+      transform: rotateY(180deg);
+      border-radius: var(--cover-radius);
+      box-shadow: none;
+    }
+
+    /*
+     * The page glued inside the cover. Same proportions as .paper-stack on the
+     * settled left half — cover overhang 1.3% above, 1.7% below, 7.3% at the
+     * fore-edge — and the same dotted paper as the inner pages, so the panel
+     * the cover carries over is the page the spread lands on.
+     */
+    .page.page--hard-cover .cover-verso::after {
+      content: '';
+      position: absolute;
+      top: 1.3%;
+      bottom: 1.7%;
+      left: 7.3%;
+      right: 0;
+      border-radius: 12px 0 0 12px;
+      background-color: #FCF9F5;
+      background-image: radial-gradient(#E0DDDB 1px, transparent 1px);
+      background-size: 16px 16px;
+      box-shadow: 0 2.5px 3px rgba(48, 34, 32, 0.4);
+    }
+
+    /*
+     * CLICK-OPEN: binding (center) edges stay square.
+     * Cover board front stays 0 R R 0 (spine LEFT in local space).
+     * Once flapping / settled open, cover is the LEFT leaf → page + verso
+     * use R 0 0 R (spine RIGHT square). Soft right page radii unchanged.
+     */
+    body.is-cover-flipping .page.page--hard-front,
+    body.is-book-open .page.page--hard-front {
+      border-radius: var(--cover-radius) 0 0 var(--cover-radius);
+    }
+
+    body.is-cover-flipping .page.page--hard-front .cover-verso,
+    body.is-book-open .page.page--hard-front .cover-verso,
+    body.is-book-opening .page.page--hard-front .cover-verso {
+      border-radius: var(--cover-radius) 0 0 var(--cover-radius);
+    }
+
+    /* Front art never rounds the spine (left) edge */
+    .page.page--hard-front .cover-front,
+    .page.page--hard-front .cover-front .cover-img,
+    body.is-cover-flipping .page.page--hard-front .cover-front,
+    body.is-book-open .page.page--hard-front .cover-front {
+      border-radius: 0 var(--cover-radius) var(--cover-radius) 0;
+    }
+
+    /*
+     * COVER VERSO DURING OPEN CURL
+     * PageFlip hard-flip pairs cover (rightPage) with page index 1
+     * (flippingPage / .page--opening-right) as one board: page 1 IS the
+     * visible backside past ~90°. Paint that leaf solid pink (#FF53C4) only —
+     * no OpenNotebookRight, no beige hard fill, no dotted paper.
+     * OpenNotebookRight stays on #open-staging (under the flap).
+     * OpenNotebookLeft joins on flap land (split spread); cleared on close.
+     * Radii match cover verso as left leaf: spine RIGHT square.
+     */
+    body.is-book-opening .page.page--opening-right,
+    body.is-book-opening .page.page--opening-right.--hard,
+    body.is-book-opening .page.page--opening-right.--soft {
+      background: #FF53C4 !important;
+      background-image: none !important;
+      background-color: #FF53C4 !important;
+      overflow: hidden;
+      border-radius: var(--cover-radius) 0 0 var(--cover-radius);
+    }
+
+    body.is-book-opening .page.page--opening-right .entry-page-inner,
+    body.is-book-opening .page.page--opening-right .ruled-lines,
+    body.is-book-opening .page.page--opening-right .page-crease {
+      display: none !important;
+      opacity: 0 !important;
+      visibility: hidden !important;
+      background: transparent !important;
+      background-image: none !important;
+    }
+
+    .cover-img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+    .entry-page-inner {
+      position: absolute;
+      inset: 12px 34px;
+      background: #FDF8F6;
+      border-radius: 20px;
+      overflow: hidden;
+      backface-visibility: hidden;
+      -webkit-backface-visibility: hidden;
+      transform: translateZ(0);
+    }
+
+    .ruled-lines {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background-image: radial-gradient(#E0DDDB 1px, transparent 1px);
+      background-size: 16px 16px;
+    }
+
+    .entries-list {
+      position: absolute;
+      inset: 0;
+      z-index: 3;
+      overflow: hidden;
+      pointer-events: none;
+      user-select: none;
+      container-type: inline-size;
+    }
+
+    .scatter-note {
+      position: absolute;
+      max-width: min(220px, 42%);
+      line-height: 1.15;
+      font-family: 'Ugly Dave', cursive, sans-serif;
+      /* Fluid type — shrinks on narrower page containers */
+      font-size: clamp(12px, 3.2vw, 14pt);
+      font-size: clamp(12px, 5.5cqi, 14pt);
+      /* Black ink; meta sits gray via opacity below. */
+      color: #1C1C1C;
+      pointer-events: none;
+      text-wrap: pretty;
+      backface-visibility: hidden;
+      -webkit-backface-visibility: hidden;
+      opacity: 0;
+      transition: opacity 0.35s ease;
+      transform-origin: center center;
+    }
+
+    .scatter-note.is-placed {
+      opacity: 1;
+    }
+
+    .scatter-note .entry-message {
+      display: block;
+      font-size: clamp(12px, 3.2vw, 14pt);
+      font-size: clamp(12px, 5.5cqi, 14pt);
+      color: #1C1C1C;
+    }
+
+    .scatter-note .entry-line {
+      display: inline-flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 0.18em;
+    }
+
+    .scatter-note .entry-meta {
+      display: block;
+      color: #6B6B6B;
+      opacity: 1;
+      font-size: clamp(10px, 2.6vw, 10.5pt);
+      font-size: clamp(10px, 4.4cqi, 10.5pt);
+    }
+
+    /* Desktop: message + name/date 4px smaller than the fluid caps above. */
+    @media (min-width: 1200px) {
+      .scatter-note,
+      .scatter-note .entry-message {
+        font-size: clamp(8px, calc(5.5cqi - 4px), calc(14pt - 4px));
+      }
+      .scatter-note .entry-meta {
+        font-size: clamp(6px, calc(4.4cqi - 4px), calc(10.5pt - 4px));
+      }
+    }
+
+    /* Name + date, 2px smaller on tablet and phone. On phone the old size was
+       already sitting on its 10px floor, so the floor drops to 8px with it —
+       otherwise the clamp would swallow the change. */
+    @media (max-width: 1199.98px) {
+      .scatter-note .entry-meta {
+        font-size: clamp(8px, calc(2.6vw - 2px), calc(10.5pt - 2px));
+        font-size: clamp(8px, calc(4.4cqi - 2px), calc(10.5pt - 2px));
+      }
+    }
+
+    /* ── Message input (Figma 1551:28298 / 1551:28306) ─────────── */
+    /*
+     * Dock keeps a fixed collapsed footprint in the body flex column
+     * (hint + message row). The pill is absolutely pinned inside
+     * .message-dock-slot so the name row expands downward into empty
+     * space without shifting #stage / frost / book.
+     */
+    .message-dock {
+      position: relative;
+      z-index: 3;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      width: min(480pt, 92vw);
+      flex-shrink: 0;
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+      transform: scale(0.97);
+      transform-origin: top center;
+      transition:
+        opacity var(--input-exit) var(--input-ease),
+        transform var(--input-exit) var(--input-ease),
+        visibility var(--input-exit);
+    }
+
+    .message-dock.is-visible {
+      opacity: 1;
+      visibility: visible;
+      pointer-events: auto;
+      transform: scale(1);
+      transition:
+        opacity var(--input-fade) var(--input-ease),
+        transform var(--input-fade) var(--input-ease),
+        visibility var(--input-fade);
+    }
+
+    /* One-line arrow-key tip — desktop only; sits 24px above the pill. */
+    .page-turn-hint {
+      display: none;
+      /* The body's column gap (same clamp) sets book → dock spacing; pull the
+         hint back up so it sits 18px under the book instead. */
+      margin: calc(18px - clamp(20px, 3.5vh, 36px)) 0 24px;
+      padding: 0;
+      color: #C7C7CC;
+      font-family: 'Switzer', sans-serif;
+      font-size: 13px;
+      font-weight: 400;
+      letter-spacing: -0.01em;
+      line-height: 1.2;
+      white-space: nowrap;
+      text-align: center;
+      pointer-events: none;
+      user-select: none;
+    }
+
+    .page-turn-hint--touch { display: block; }
+
+    @media (hover: hover) and (pointer: fine) {
+      .page-turn-hint--touch { display: none; }
+      .page-turn-hint--desktop {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+      }
+    }
+
+    .page-turn-hint__key {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 16px;
+      height: 16px;
+      flex-shrink: 0;
+      border-radius: 4px;
+      border: 1px solid rgb(0 0 0 / 0.18);
+      background: #FAFAFA;
+      color: rgb(0 0 0 / 0.55);
+      box-shadow: 0 1px 0 rgb(0 0 0 / 0.06);
+      /* Real buttons: clicking a key cap turns the page like the arrow key. */
+      padding: 0;
+      font: inherit;
+      cursor: pointer;
+      pointer-events: auto;
+      -webkit-tap-highlight-color: transparent;
+      transition: transform 120ms ease-out, background-color 120ms ease-out;
+    }
+
+    /* Word key (esc): same cap, sized to its label instead of square. */
+    .page-turn-hint__key--text {
+      width: auto;
+      padding: 0 4px;
+      font-size: 11px;
+      font-weight: 500;
+      line-height: 1;
+      letter-spacing: 0;
+    }
+
+    .page-turn-hint__key:hover { background: #FFFFFF; }
+    .page-turn-hint__key:active { transform: scale(0.9); }
+    .page-turn-hint__key:focus-visible {
+      outline: 2px solid #FFFFFF;
+      outline-offset: 2px;
+    }
+
+    .page-turn-hint__key svg {
+      display: block;
+      width: 10px;
+      height: 10px;
+    }
+
+    .message-dock-slot {
+      position: relative;
+      width: 100%;
+      height: 42pt; /* phone / tablet / small desktop; 64pt at tall viewports */
+    }
+
+    .message-error {
+      display: none;
+      margin: 8px 4px 0;
+      padding: 0 6px;
+      color: #B42318;
+      font-family: 'Switzer', sans-serif;
+      font-size: 12px;
+      line-height: 1.35;
+      letter-spacing: -0.01em;
+    }
+
+    .message-dock.is-error .message-error {
+      display: block;
+    }
+
+    .message-dock.is-error .message-pill {
+      animation: message-pill-shake 0.42s ease;
+    }
+
+    @keyframes message-pill-shake {
+      0%, 100% { transform: translateX(0); }
+      20% { transform: translateX(-4px); }
+      40% { transform: translateX(4px); }
+      60% { transform: translateX(-3px); }
+      80% { transform: translateX(2px); }
+    }
+
+    /* Pill = column of row1 (message+send) + optional name row */
+    .message-pill {
+      position: absolute;
+      top: 0;
+      left: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: stretch;
+      width: 100%;
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      border: none;
+      border-radius: 16px;
+      overflow: hidden;
+      background: #F4F4F4;
+      box-shadow: none;
+      cursor: text;
+      transform-origin: top center;
+    }
+
+    .message-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      width: 100%;
+      /* 48pt (64px) less 8px — 4px off the top and 4px off the bottom. The
+         padding is not the lever here: box-sizing is border-box and the height
+         is fixed, so trimming padding only grows the field inside the same
+         pill. */
+      height: 42pt;
+      min-height: 42pt;
+      box-sizing: border-box;
+      padding: 8px calc(16pt - 8px) 8px 14px; /* 8px off each side from the original 16pt / 22px */
+    }
+
+    /* Collapse/expand name row (~180ms) without fighting dock fade */
+    .message-name-slot {
+      display: grid;
+      grid-template-rows: 0fr;
+      opacity: 0;
+      pointer-events: none;
+      transition:
+        grid-template-rows 180ms ease,
+        opacity 180ms ease;
+    }
+
+    .message-pill.is-hinted .message-name-slot {
+      grid-template-rows: 1fr;
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .message-name-inner {
+      overflow: hidden;
+      min-height: 0;
+      border-top: 1px solid rgba(28, 28, 28, 0.08);
+    }
+
+    /* Left edge matches .message-row, so the name field and its placeholder
+       line up with the message input above rather than sitting indented. */
+    .message-name-row {
+      /* 4px -> 2px top/bottom: tighten gap to the divider and pill edge. */
+      padding: 2px calc(16pt - 8px) 2px 14px;
+    }
+
+    #name-input,
+    .name-native {
+      display: block;
+      width: 100%;
+      box-sizing: border-box;
+      margin: 0;
+      padding: 10px 0 12px;
+      height: fit-content;
+      border: 0;
+      outline: none;
+      background: transparent;
+      color: #1C1C1C;
+      font-family: 'Switzer', sans-serif;
+      font-size: 14px;
+      font-weight: 400;
+      line-height: 1.35;
+      letter-spacing: -0.01em;
+    }
+
+    #name-input::placeholder,
+    .name-native::placeholder {
+      color: #A3A3A3;
+      opacity: 1;
+    }
+
+    .message-field-wrap {
+      position: relative;
+      flex: 1 1 auto;
+      min-width: 0;
+      display: flex;
+      align-items: center;
+      min-height: 28px;
+    }
+
+    .message-mirror {
+      display: flex;
+      align-items: center;
+      width: 100%;
+      min-height: 28px;
+      font-family: 'Switzer', sans-serif;
+      /* 14px, matching #name-input below. Placeholder and typed text are the
+         same element here, so this sets both. */
+      font-size: 14px;
+      font-weight: 400;
+      line-height: 1.35;
+      letter-spacing: -0.01em;
+      white-space: pre;
+      overflow: hidden;
+      pointer-events: none;
+    }
+
+    .message-mirror-text {
+      color: #1C1C1C;
+    }
+
+    .message-mirror.is-empty .message-mirror-text {
+      color: #A3A3A3;
+    }
+
+    /* Hide placeholder while focused+empty so caret sits at left-most start */
+    .message-pill.is-empty.is-focused .message-mirror-text {
+      display: none;
+    }
+
+    .message-caret {
+      display: none;
+      flex: 0 0 auto;
+      width: 1.25pt; /* thinner stroke than the original 2pt */
+      height: 1.05em;
+      margin-left: 2pt; /* Figma typed state: 2pt gap after last glyph */
+      background: #1C1C1C;
+      border-radius: 999px; /* round/pill caps on short vertical bar */
+      animation: message-caret-blink 1.05s steps(1, end) infinite;
+    }
+
+    .message-pill.is-focused .message-caret {
+      display: inline-block;
+    }
+
+    .message-pill.is-empty.is-focused .message-caret {
+      margin-left: 0;
+    }
+
+    @keyframes message-caret-blink {
+      0%, 49% { opacity: 1; }
+      50%, 100% { opacity: 0; }
+    }
+
+    #message-input,
+    .message-native {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      border: 0;
+      outline: none;
+      background: transparent;
+      color: transparent;
+      caret-color: transparent;
+      font-family: 'Switzer', sans-serif;
+      font-size: 14px; /* keep in step with .message-mirror */
+      font-weight: 400;
+      line-height: 1.35;
+      letter-spacing: -0.01em;
+    }
+
+    #message-input::selection,
+    .message-native::selection {
+      background: rgba(28, 28, 28, 0.14);
+      color: transparent;
+    }
+
+    /* Send = 28pt hit area; 16pt icon only (no empty fill); 16pt from pill right */
+    .message-send {
+      flex: 0 0 auto;
+      width: 28pt;
+      height: 28pt;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border: 0;
+      border-radius: 8pt;
+      background: transparent;
+      color: #DDDDDD; /* empty: icon only, no fill */
+      cursor: default;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+      transition: background 0.18s ease, color 0.18s ease;
+    }
+
+    /* Ready = the plane's stroke goes black. No filled chip behind it — the
+       icon alone carries the state. */
+    .message-send.is-ready,
+    .message-pill.is-ready .message-send {
+      background: transparent;
+      color: #000;
+      cursor: pointer;
+    }
+
+    .message-send.is-ready:hover,
+    .message-send.is-ready:focus-visible,
+    .message-pill.is-ready .message-send:hover,
+    .message-pill.is-ready .message-send:focus-visible {
+      background: transparent;
+      color: #000;
+      outline: none;
+    }
+
+    .message-send:disabled {
+      cursor: default;
+    }
+
+    .send-icon {
+      display: block;
+      width: 16pt;
+      height: 16pt;
+      overflow: visible;
+      pointer-events: none;
+    }
+
+    .send-plane {
+      transform-origin: 70% 30%;
+      transform-box: fill-box;
+      transition: transform 0.5s cubic-bezier(0.23, 1, 0.32, 1);
+    }
+
+    .send-trail {
+      fill: none;
+      stroke: currentColor;
+      stroke-width: 1;
+      stroke-dasharray: 2 2;
+      stroke-dashoffset: 40;
+      opacity: 0;
+      transform: translate(-3px, 3px);
+      transition:
+        opacity 0.3s ease,
+        transform 0.3s ease,
+        stroke-dashoffset 0.3s ease;
+    }
+
+    .message-send.is-ready:hover .send-plane,
+    .message-send.is-animating .send-plane {
+      transform: translate(3px, -3px) scale(0.8);
+    }
+
+    .message-send.is-ready:hover .send-trail,
+    .message-send.is-animating .send-trail {
+      opacity: 1;
+      transform: translate(0, 0);
+      stroke-dashoffset: 0;
+      transition:
+        opacity 0.55s ease 0.1s,
+        transform 0.55s ease 0.1s,
+        stroke-dashoffset 0.55s ease 0.1s;
+    }
+
+    .page-crease { position: absolute; top: 0; bottom: 0; width: 34px; pointer-events: none; z-index: 20; }
+    .page-crease.left  { left: 0;  background: linear-gradient(to right, rgba(0,0,0,0.05), transparent); }
+    .page-crease.right { right: 0; background: linear-gradient(to left,  rgba(0,0,0,0.05), transparent); }
+
+    .cover-placeholder {
+      position: absolute; inset: 0;
+      display: none;
+      background: #FDF8F6;
+    }
+
+    @media (max-width: 640px) {
+      :root {
+        --book-depth: 22px;
+        --page-tx: -18px;
+      }
+      .book-right-page { width: 18px; }
+    }
+
+    /* Tall viewports: larger default input field */
+    @media (min-height: 1400px) {
+      .message-dock-slot {
+        height: 64pt;
+      }
+
+      .message-row {
+        height: 64pt;
+        min-height: 64pt;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .book,
+      .book-cover,
+      .book-right-page,
+      .book-wrap,
+      .frost-overlay,
+      .message-dock,
+      .message-name-slot,
+      .send-plane,
+      .send-trail {
+        transition-duration: 0.01ms !important;
+        transition-delay: 0ms !important;
+      }
+
+      .message-caret {
+        animation: none !important;
+        opacity: 1;
+      }
+
+      #book-wrapper {
+        transition:
+          opacity 0.01ms ease-out !important,
+          visibility 0.01ms !important;
+      }
+    }
+  
+    /* --- Tablet / mobile -------------------------------------------------
+     * Tighter corners all round — the desktop radii read as very round once
+     * the book and the dock are this small — and a shorter input row.
+     */
+    @media (max-width: 1199.98px) {
+      :root,
+      .book-cover {
+        --cover-radius: 16px;
+        --cover-radius-closed: 10px;
+      }
+
+      #book,
+      #book-wrapper,
+      #book.stf__parent,
+      #book .stf__block,
+      body.is-book-open #stage,
+      .page[data-density="hard"] {
+        border-radius: 16px;
+      }
+
+      .page.--left  { border-radius: 16px 0 0 16px; }
+      .page.--right { border-radius: 0 16px 16px 0; }
+
+      .message-pill { border-radius: 12px; }
+
+      /* 42pt (56px) is too tall for the dock before the name row opens. */
+      .message-dock,
+      .message-row {
+        height: 48px;
+        min-height: 48px;
+      }
+
+      /* Tighter name row once the name field opens: 0 -> 4px top and bottom. */
+      .message-name-row {
+        padding-top: 4px;
+        padding-bottom: 4px;
+      }
+
+      #name-input,
+      .name-native {
+        padding: 6px 0 8px;
+      }
+
+      /* Send icon 20% smaller (16pt -> 12.8pt); hit area unchanged. */
+      .send-icon {
+        width: 12.8pt;
+        height: 12.8pt;
+      }
+
+      /* Dot grid scales with the page (desktop: 16px grid on a 440px page). */
+      .ruled-lines {
+        --dot-step: calc(var(--book-w) * 16 / 440);
+        --dot-r: max(0.5px, calc(var(--book-w) / 440));
+        background-image: radial-gradient(#E0DDDB var(--dot-r), transparent var(--dot-r));
+        background-size: var(--dot-step) var(--dot-step);
+      }
+    }
+</style>
+
+<style id="dock-mode">
+/* ── Docked mode ──────────────────────────────────────────────────────────
+   The book is embedded in the portfolio footer. The iframe is ALWAYS the full
+   viewport so the book's own layout (--book-w/--book-h, PageFlip sizing) never
+   changes — resizing the frame mid-open would reflow the spread in the middle of
+   the cover flip. Docking is purely a transform on #stage, so every animation
+   below it is the source's own, untouched.
+
+   Timings deliberately reuse the source's modal curve: opening (leaving docked)
+   uses --modal-enter, closing (returning to docked) uses --modal-exit, matching
+   the frost it moves with. */
+body.is-embed {
+  background: transparent;
+  overflow: visible !important;
+}
+html:has(body.is-embed) {
+  overflow: visible;
+}
+
+#stage {
+  transition: transform var(--modal-enter) var(--modal-ease);
+}
+body.is-docked {
+  /* Closed cover's outer corners — top-right and bottom-right; the spine side is
+     already 0. Two 10% steps up from the source's 11.2px (11.2 -> 12.32 -> 13.55). */
+  --cover-radius-closed: 13.55px;
+}
+
+body.is-docked #stage {
+  transform: translate(var(--dock-tx, 0px), var(--dock-ty, 0px)) scale(var(--dock-scale, 1));
+  transform-origin: center center;
+  /* Returning home after the cover has flipped back: the book shrinks from the
+     centre down into the footer slot. Longer than --modal-exit so the travel
+     actually reads, on the same curve as the rest of the modal motion. */
+  transition: transform 480ms var(--modal-ease);
+}
+
+/* Nothing but the book itself belongs on the page while docked. */
+body.is-docked #message-dock,
+body.is-docked #notebook-paint-warm {
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+/*
+ * Closing: the frost leaves with the book rather than waiting for the cover flip
+ * to finish. finishClose() only drops it at ~600ms, which left the blur hanging
+ * over the page for ~300ms after the book had already gone home. Fading it from
+ * the moment of dismiss lands the two together. ID selector so it outranks
+ * .frost-overlay.is-active.
+ */
+body.is-closing-home #frost {
+  opacity: 0;
+  transition: opacity 380ms var(--modal-ease);
+}
+
+/* Docked, the book sits square to the page: the in-plane rotate(5deg) lean and
+   the standalone -10deg resting rotateY both read as a tilt in the footer slot.
+   Hover/focus are excluded so the peek below still gets its -20deg. */
+body.is-docked .book-wrap.is-closed {
+  transform: none;
+}
+body.is-docked .book-wrap.is-closed .book:not(:hover):not(:focus-visible):not(.is-peek) {
+  transform: rotateX(0deg) rotateY(0deg);
+}
+
+/* Hover peek: the -20deg tilt exposes the page block, whose faces are cream
+   (#F7F0EC / the paper gradient). Fill them with the flap's dark pink so the
+   inner side reads as one colour instead of showing white. */
+.book-wrap.is-closed .book:hover .book-pages-front,
+.book-wrap.is-closed .book:focus-visible .book-pages-front,
+.book-wrap.is-closed .book.is-peek .book-pages-front,
+.book-wrap.is-closed .book:hover .book-pages-edge,
+.book-wrap.is-closed .book:focus-visible .book-pages-edge,
+.book-wrap.is-closed .book.is-peek .book-pages-edge,
+.book-wrap.is-closed .book:hover .book-pages-top,
+.book-wrap.is-closed .book:focus-visible .book-pages-top,
+.book-wrap.is-closed .book.is-peek .book-pages-top {
+  background-image: none;
+  background-color: #D4008B;
+  transition: background-color 0.2s ease;
+}
+
+/* Hover peek: the flap alone is the back of the book. The page block behind the
+   cover is hidden so no second shape (fore-edge, top face, shelves) can show
+   beside or through it. */
+.book-wrap.is-closed .book:hover .book-pages,
+.book-wrap.is-closed .book:focus-visible .book-pages,
+.book-wrap.is-closed .book.is-peek .book-pages {
+  opacity: 0;
+}
+
+/* The D4008B flap is retired: on hover the book's back is the Book Back art
+   alone, with nothing pink-dark layered in front of it. */
+.book-wrap.is-closed .book:hover .book-right-page,
+.book-wrap.is-closed .book:focus-visible .book-right-page,
+.book-wrap.is-closed .book.is-peek .book-right-page {
+  opacity: 0 !important;
+  visibility: hidden;
+}
+
+/* Underpaint behind the open notebook halves. The left already carries
+   #FF53C4 (cover pink); the right was cream (#F8F0E8), which showed as a pale edge where the
+   PNG's corners are transparent or clipped by the border radius. */
+.open-right-page-bg {
+  background-color: #FF53C4;
+}
+</style>
+</head>
+<body>
+  <!-- Envelope-matched frost: blurs/dims background; click closes -->
+  <div
+    id="frost"
+    class="frost-overlay"
+    role="button"
+    tabindex="-1"
+    aria-label="Close guestbook"
+    aria-hidden="true"
+  ></div>
+
+  <div id="stage">
+    <!-- CLOSED: Vault-style CSS 3D book -->
+    <div class="book-wrap is-closed" id="closed-book">
+      <div
+        class="book"
+        id="css-book"
+        role="button"
+        tabindex="0"
+        aria-label="Open guestbook"
+      >
+        <div class="book-back"></div>
+        <div class="book-pages" aria-hidden="true">
+          <div class="book-pages-front"></div>
+          <div class="book-pages-shelf"></div>
+          <div class="book-pages-shelf"></div>
+          <div class="book-pages-shelf"></div>
+          <div class="book-pages-shelf"></div>
+          <div class="book-pages-edge"></div>
+          <div class="book-pages-top"></div>
+        </div>
+        <div class="book-cover">
+          <div class="book-cover-face">
+            <img src="Assets/Images/Cover.png?v=1789859770" alt="Guestbook cover" />
+          </div>
+          <div class="book-cover-inner"></div>
+        </div>
+        <div class="book-right-page"></div>
+        <div class="book-shadow"></div>
+      </div>
+    </div>
+
+    <!-- OPEN: StPageFlip experience -->
+    <div id="book-wrapper">
+      <!--
+        Open-spread staging (under #book / flipping cover): two coded halves,
+        0 gap. Opening: right only. Land: both. Close-to-cover: hide left.
+        Each half is a cover board plus a stack of sheets - see
+        "CODED OPEN SPREAD" for what the layers mean.
+      -->
+      <div id="open-staging" aria-hidden="true">
+        <div class="open-left-page-bg">
+          <div class="paper-stack">
+            <span class="paper-sheet" style="--i:14"></span>
+            <span class="paper-sheet" style="--i:13"></span>
+            <span class="paper-sheet" style="--i:12"></span>
+            <span class="paper-sheet" style="--i:11"></span>
+            <span class="paper-sheet" style="--i:10"></span>
+            <span class="paper-sheet" style="--i:9"></span>
+            <span class="paper-sheet" style="--i:8"></span>
+            <span class="paper-sheet" style="--i:7"></span>
+            <span class="paper-sheet" style="--i:6"></span>
+            <span class="paper-sheet" style="--i:5"></span>
+            <span class="paper-sheet" style="--i:4"></span>
+            <span class="paper-sheet" style="--i:3"></span>
+            <span class="paper-sheet" style="--i:2"></span>
+            <span class="paper-sheet" style="--i:1"></span>
+            <span class="paper-top"></span>
+          </div>
+        </div>
+        <div class="open-right-page-bg">
+          <div class="paper-stack">
+            <span class="paper-sheet" style="--i:14"></span>
+            <span class="paper-sheet" style="--i:13"></span>
+            <span class="paper-sheet" style="--i:12"></span>
+            <span class="paper-sheet" style="--i:11"></span>
+            <span class="paper-sheet" style="--i:10"></span>
+            <span class="paper-sheet" style="--i:9"></span>
+            <span class="paper-sheet" style="--i:8"></span>
+            <span class="paper-sheet" style="--i:7"></span>
+            <span class="paper-sheet" style="--i:6"></span>
+            <span class="paper-sheet" style="--i:5"></span>
+            <span class="paper-sheet" style="--i:4"></span>
+            <span class="paper-sheet" style="--i:3"></span>
+            <span class="paper-sheet" style="--i:2"></span>
+            <span class="paper-sheet" style="--i:1"></span>
+            <span class="paper-top"></span>
+          </div>
+        </div>
+      </div>
+      <div id="book"></div>
+    </div>
+  </div>
+
+  <!-- Figma message input — visible after 50% of frost enter -->
+  <div id="message-dock" class="message-dock" aria-hidden="true">
+    <p class="page-turn-hint page-turn-hint--desktop">
+      <span>Turn pages by pressing</span>
+      <button type="button" class="page-turn-hint__key" data-flip="prev" aria-label="Previous page">
+        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path d="M15 6 9 12l6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </button>
+      <span>or</span>
+      <button type="button" class="page-turn-hint__key" data-flip="next" aria-label="Next page">
+        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path d="m9 6 6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </button>
+      <span>key, press</span>
+      <button type="button" class="page-turn-hint__key page-turn-hint__key--text" data-close aria-label="Close guestbook">esc</button>
+      <span>to exit</span>
+    </p>
+    <!-- Touch (phone / tablet): no keyboard, so no key caps — just how to close. -->
+    <p class="page-turn-hint page-turn-hint--touch">Tap an empty area to close</p>
+    <div class="message-dock-slot">
+      <form id="message-form" class="message-pill is-empty" autocomplete="off">
+        <div class="message-row">
+          <div class="message-field-wrap">
+            <div class="message-mirror is-empty" aria-hidden="true">
+              <span class="message-mirror-text">Write your message ...</span><span class="message-caret"></span>
+            </div>
+            <input
+              id="message-input"
+              class="message-native"
+              type="text"
+              maxlength="120"
+              enterkeyhint="send"
+              aria-label="Write your message"
+              spellcheck="false"
+            />
+          </div>
+          <button
+            type="submit"
+            id="message-send"
+            class="message-send"
+            aria-label="Send message"
+            disabled
+          >
+            <svg class="send-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+              <g class="send-plane" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z" />
+                <path d="m21.854 2.147-10.94 10.939" />
+              </g>
+              <path
+                class="send-trail"
+                d="M -3 28 C -0.5 26.8 1.6 24.6 3.3 22 C 4.8 19.7 5.2 17.6 4.2 16.1 C 3.2 14.7 1.4 14.5 0.3 15.8 C -0.9 17.2 -0.6 19.4 1.2 20.4 C 3.4 21.5 6.4 19.4 9 15.8"
+              />
+            </svg>
+          </button>
+        </div>
+        <div class="message-name-slot" aria-hidden="true">
+          <div class="message-name-inner">
+            <div class="message-name-row">
+              <input
+                id="name-input"
+                class="name-native"
+                type="text"
+                maxlength="40"
+                placeholder="Your name (optional)"
+                aria-label="Your name (optional)"
+                autocomplete="name"
+                spellcheck="false"
+                tabindex="-1"
+              />
+            </div>
+          </div>
+        </div>
+      </form>
+      <p id="message-error" class="message-error" role="alert" aria-live="polite"></p>
+    </div>
+  </div>
+
+  <!-- Keeps both open-spread halves decoded at display size (offscreen) -->
+  <div id="notebook-paint-warm" aria-hidden="true">
+    <div class="warm-left"></div>
+    <div class="warm-right"></div>
+  </div>
+
+  <script>
+    var INNER_SPREADS = 20; // 40 inner pages to flip through
+    /** Cover.png is 771×998 — one shared page size for CSS book + PageFlip */
+    var PAGE_ASPECT = 998 / 771;
+    /** Must match PageFlip flippingTime — open/close cover curl duration */
+    var FLIPPING_TIME = 264; // 600ms -> 240ms (60% faster), then +10% slower
+    /* The cover turns as soon as the book has landed — no beat before it. */
+    var OPEN_FLIP_DELAY = 0;
+    /**
+     * Frost enter = --modal-enter (400ms).
+     * Input fade-in starts at 50% → 200ms after open frost starts.
+     */
+    var MODAL_ENTER_MS = 400;
+    // 200ms (half the frost enter) less 50ms. The bar now starts before the
+    // frost is halfway in, which is as early as this can go without it
+    // arriving ahead of the book.
+    var INPUT_SHOW_DELAY_MS = Math.round(MODAL_ENTER_MS * 0.5) - 50; // 150
+    var STORAGE_KEY = (window.GuestbookApi && GuestbookApi.STORAGE_KEY) || 'guestbook_v3';
+    var NOTE_COLORS = ['#1C1C1C', '#2E2E2E', '#3A3A3A', '#252525', '#4A4A4A'];
+    var messageErrorEl = document.getElementById('message-error');
+    // Accented Latin and everyday symbols are kept; only characters the
+    // handwriting face cannot draw are dropped. Smart punctuation is folded to
+    // ASCII first (see foldPunctuation) rather than deleted.
+    var ENGLISH_ONLY_RE = /[^A-Za-z0-9\u00C0-\u024F .,!?'"\-:;()&/+=@#*%_\[\]{}]/g;
+    var ENGLISH_ONLY_TEST = /[^A-Za-z0-9\u00C0-\u024F .,!?'"\-:;()&/+=@#*%_\[\]{}]/;
+    var UNSUPPORTED_MSG = 'This book can only letter English characters.';
+    var ASSETS = {
+      cover: 'Assets/Images/Cover.png?v=1789859770',
+      back: 'Assets/Images/Back.png?v=1785618989',
+      notebookLeft: 'Assets/Images/OpenNotebookLeft.webp?v=1785622900',
+      notebookLeftPng: 'Assets/Images/OpenNotebookLeft.png',
+      notebookRight: 'Assets/Images/OpenNotebookRight.webp?v=1785620413',
+      notebookRightPng: 'Assets/Images/OpenNotebookRight.png'
+    };
+    var pageFlip = null;
+    var totalPageCount = 0;
+    /** @type {'closed'|'opening'|'open'|'closing'} */
+    var phase = 'closed';
+    var openTimer = null;
+    var inputShowTimer = null;
+    var prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+    var bookSize = { pageWidth: 320, pageHeight: 425 };
+    var assetsReady = false;
+    var assetsPromise = null;
+
+    var closedWrap = document.getElementById('closed-book');
+    var cssBook = document.getElementById('css-book');
+    var bookWrapper = document.getElementById('book-wrapper');
+    var bookEl = document.getElementById('book');
+    var frostEl = document.getElementById('frost');
+    var messageDock = document.getElementById('message-dock');
+    var messageForm = document.getElementById('message-form');
+    var messageInput = document.getElementById('message-input');
+    var nameInput = document.getElementById('name-input');
+    var nameSlot = messageForm.querySelector('.message-name-slot');
+    var messageMirror = messageForm.querySelector('.message-mirror');
+    var messageMirrorText = messageForm.querySelector('.message-mirror-text');
+    var messageSend = document.getElementById('message-send');
+    var PLACEHOLDER = 'Write your message ...';
+    /** Pause after typing before revealing optional name row */
+    var NAME_HINT_MS = 750; // was 900 — name slot appears 150ms sooner
+    var nameHintTimer = null;
+    var nameHinted = false;
+
+    function setFrostActive(active) {
+      frostEl.classList.toggle('is-active', active);
+      frostEl.setAttribute('aria-hidden', active ? 'false' : 'true');
+      frostEl.tabIndex = active ? 0 : -1;
+      document.body.classList.toggle('is-book-open', active);
+    }
+
+    /**
+     * macOS and iOS substitute curly quotes, en/em dashes and an ellipsis while
+     * you type. Those are outside the allowed set, so filtering alone quietly
+     * ate them -- "I'm" came out "Im". Fold them to their ASCII equivalents
+     * first, then filter.
+     */
+    var SMART_PUNCTUATION = [
+      [/[\u2018\u2019\u201A\u201B]/g, "'"],
+      [/[\u201C\u201D\u201E\u201F]/g, '"'],
+      [/[\u2013\u2014\u2212]/g, '-'],
+      [/\u2026/g, '...'],
+      [/\u00A0/g, ' ']
+    ];
+
+    function foldPunctuation(value) {
+      var out = String(value || '');
+      for (var i = 0; i < SMART_PUNCTUATION.length; i++) {
+        out = out.replace(SMART_PUNCTUATION[i][0], SMART_PUNCTUATION[i][1]);
+      }
+      return out;
+    }
+
+    function sanitizeEnglishOnly(value) {
+      return foldPunctuation(value).replace(ENGLISH_ONLY_RE, '');
+    }
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    function loadEntries() {
+      if (window.GuestbookApi) return GuestbookApi.readLocal();
+      try {
+        var parsed = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+        return Array.isArray(parsed) ? parsed : [];
+      } catch (_err) {
+        return [];
+      }
+    }
+
+    function showMessageError(text) {
+      if (messageErrorEl) messageErrorEl.textContent = text || '';
+      messageDock.classList.add('is-error');
+      clearTimeout(showMessageError._t);
+      showMessageError._t = setTimeout(function () {
+        messageDock.classList.remove('is-error');
+      }, 3200);
+    }
+
+    function clearMessageError() {
+      messageDock.classList.remove('is-error');
+      if (messageErrorEl) messageErrorEl.textContent = '';
+    }
+
+    function getTodayStamp() {
+      var now = new Date();
+      var month = String(now.getMonth() + 1).padStart(2, '0');
+      var day = String(now.getDate()).padStart(2, '0');
+      return month + '/' + day + '/' + now.getFullYear();
+    }
+
+    function isContentPage(pageIndex) {
+      var last = Math.max(0, totalPageCount - 1);
+      return pageIndex > 0 && pageIndex < last;
+    }
+
+    /** Prefer the right leaf of the current open spread. */
+    function getTargetPageIndex() {
+      if (!pageFlip) return 1;
+      var idx = pageFlip.getCurrentPageIndex();
+      var last = Math.max(0, totalPageCount - 1);
+      if (idx <= 0 || idx >= last) return Math.min(1, Math.max(0, last - 1));
+      // showCover: odd indices are right pages (1, 3, 5…)
+      if (idx % 2 === 1) return idx;
+      if (idx + 1 < last) return idx + 1;
+      return idx;
+    }
+
+    /**
+     * Other leaf of the *same* open spread (no flip needed to show it).
+     * Page indices: 1=right alone, then spreads (2|3), (4|5), …
+     * Page 1 has no same-flap partner — overflow to 2 requires a flip.
+     */
+    function getSpreadPartner(pageIndex) {
+      if (!isContentPage(pageIndex)) return null;
+      if (pageIndex === 1) return null;
+      if (pageIndex % 2 === 1) return pageIndex - 1; // right → left (same flap)
+      return pageIndex + 1; // left → right (same flap)
+    }
+
+    /**
+     * Try order on the currently open flap: current side first, then the
+     * other side of the same spread (left↔right). No page turn for either.
+     */
+    function getSameSpreadTryOrder() {
+      var preferred = getTargetPageIndex();
+      var partner = getSpreadPartner(preferred);
+      // On a full open spread, overflow left → right without flipping
+      if (
+        partner != null &&
+        partner !== preferred &&
+        isContentPage(partner) &&
+        partner % 2 === 0 &&
+        preferred % 2 === 1
+      ) {
+        return [partner, preferred];
+      }
+      var order = [preferred];
+      if (partner != null && partner !== preferred && isContentPage(partner)) {
+        order.push(partner);
+      }
+      return order;
+    }
+
+    /** Next content page after the current spread (requires a flip). */
+    function getNextOverflowPage(pageIndex) {
+      var right = pageIndex % 2 === 1 ? pageIndex : pageIndex + 1;
+      if (pageIndex === 1) right = 1;
+      var candidates = pageIndex === 1
+        ? [2, 3]
+        : [right + 2, right + 1, right + 3];
+      for (var i = 0; i < candidates.length; i++) {
+        if (isContentPage(candidates[i])) return candidates[i];
+      }
+      return null;
+    }
+
+    /** True when both pages are already visible on the open flap (no flip). */
+    function isSameOpenSpread(pageIndex) {
+      if (!pageFlip || !isContentPage(pageIndex)) return false;
+      var current = pageFlip.getCurrentPageIndex();
+      if (pageIndex === current) return true;
+      // Open spread at even index L shows L|L+1
+      if (current % 2 === 0) {
+        return pageIndex === current || pageIndex === current + 1;
+      }
+      // At right page R (odd): alone for R===1; otherwise spread is (R-1)|R
+      if (current === 1) return pageIndex === 1;
+      return pageIndex === current || pageIndex === current - 1;
+    }
+
+    function getEntriesList(pageIndex) {
+      if (!bookEl) return null;
+      return bookEl.querySelector(
+        '.entries-list[data-flip-index="' + pageIndex + '"]'
+      );
+    }
+
+    function applyPlacementToNote(note, placement) {
+      note.style.left = placement.xPercent.toFixed(2) + '%';
+      note.style.top = placement.yPercent.toFixed(2) + '%';
+      note.dataset.rotation = String(placement.rotation);
+      note.style.transform = 'rotate(' + placement.rotation + 'deg)';
+    }
+
+    function revealNote(note) {
+      requestAnimationFrame(function () {
+        note.classList.add('is-placed');
+      });
+    }
+
+    function createScatterNote(entry) {
+      var note = document.createElement('div');
+      note.className = 'scatter-note';
+      note.dataset.entryId = entry.id || '';
+      var vibe = entry.vibe || {};
+      var rotation =
+        typeof vibe.rotation === 'number' ? vibe.rotation : 0;
+      note.dataset.rotation = String(rotation);
+      if (vibe.top) note.style.top = vibe.top;
+      if (vibe.left) note.style.left = vibe.left;
+      note.style.transform = 'rotate(' + rotation + 'deg)';
+      note.style.fontFamily = "'Ugly Dave', cursive, sans-serif";
+      /* Always black/gray ink — ignore any stored chromatic vibe.color. */
+      note.style.color = '#1C1C1C';
+      var displayName =
+        entry.name && entry.name !== '—' ? entry.name : 'Anonymous';
+      var metaParts = [escapeHtml(displayName)];
+      if (entry.date) metaParts.push(escapeHtml(entry.date));
+      var metaHtml =
+        '<span class="entry-meta">' + metaParts.join(' ') + '</span>';
+      note.innerHTML =
+        '<span class="entry-line">' +
+        '<span class="entry-message">' + escapeHtml(entry.message) + '</span>' +
+        metaHtml +
+        '</span>';
+      return note;
+    }
+
+    function isBookCoverEntry(entry) {
+      return entry && entry.source === 'book-cover' && entry.vibe;
+    }
+
+    function persistEntries(entries) {
+      if (window.GuestbookApi) {
+        GuestbookApi.saveAllLocal(entries);
+        return;
+      }
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
+      } catch (_err) {
+        /* ignore quota / private mode */
+      }
+    }
+
+    function syncEntryToCloud(entry) {
+      if (!window.GuestbookApi) return;
+      GuestbookApi.createEntry(entry).catch(function (err) {
+        if (err && err.code === 'PROFANITY') {
+          showMessageError(err.message);
+        }
+      });
+    }
+
+    /** Re-measure + re-place every note on a page (rotated AABB, 16px gap). */
+    function relayoutPageNotes(pageIndex, persist) {
+      var NP = window.NotePlacement;
+      if (!NP) return;
+      var list = getEntriesList(pageIndex);
+      if (!list) return;
+      var notes = Array.prototype.slice.call(
+        list.querySelectorAll('.scatter-note')
+      );
+      if (!notes.length) return;
+
+      var cw = list.clientWidth;
+      var ch = list.clientHeight;
+      if (cw <= 0 || ch <= 0) return;
+
+      var sizes = notes.map(function (n) {
+        return NP.measureUnrotatedSize(n);
+      });
+      var rotations = notes.map(function (n) {
+        var r = parseFloat(n.dataset.rotation);
+        return isFinite(r) ? r : 0;
+      });
+      /* Where each note already sits, so a relayout keeps valid notes where they
+         are instead of reshuffling the whole page. */
+      var preferred = notes.map(function (n, i) {
+        if (!n.style.left && !n.style.top) return null;
+        var lx = parseFloat(n.style.left), ty = parseFloat(n.style.top);
+        if (!isFinite(lx) || !isFinite(ty)) return null;
+        return {
+          cx: (lx / 100) * cw + sizes[i].width / 2,
+          cy: (ty / 100) * ch + sizes[i].height / 2
+        };
+      });
+
+      var placements = NP.placeNotes({
+        containerWidth: cw,
+        containerHeight: ch,
+        sizes: sizes,
+        rotations: rotations,
+        strict: true,
+        preferred: preferred
+      });
+
+      /*
+       * Notes are never stacked on top of one another. A note that does not fit
+       * here goes to the NEXT page — left page -> right page of the same spread
+       * -> the next spread's left page — so overflow reads in page order. Notes
+       * are placed oldest-first, so it is the newest ones that move on. Only the
+       * very last page, with nowhere left to go, falls back to overlapping.
+       */
+      var nextPage = pageIndex + 1;
+      var canEvict = isContentPage(nextPage);
+      var nextList = canEvict ? getEntriesList(nextPage) : null;
+      var evicted = [];
+
+      var entries = persist ? loadEntries() : null;
+      notes.forEach(function (note, i) {
+        var p = placements[i];
+        if (!p) return;
+        if (p.fitted === false && canEvict && nextList) {
+          // Cleared so the target page places it afresh when it next measures.
+          note.style.left = '';
+          note.style.top = '';
+          note.classList.remove('is-placed');
+          nextList.appendChild(note);
+          evicted.push(note);
+          if (entries) {
+            var mid = note.dataset.entryId;
+            for (var m = 0; m < entries.length; m++) {
+              if (entries[m].id !== mid) continue;
+              entries[m].pageIndex = nextPage;
+              break;
+            }
+          }
+          return;
+        }
+        applyPlacementToNote(note, p);
+        note.classList.add('is-placed');
+        if (!entries) return;
+        var id = note.dataset.entryId;
+        for (var e = 0; e < entries.length; e++) {
+          if (entries[e].id !== id) continue;
+          entries[e].pageIndex = pageIndex;
+          entries[e].vibe = Object.assign({}, entries[e].vibe || {}, {
+            top: p.yPercent.toFixed(2) + '%',
+            left: p.xPercent.toFixed(2) + '%',
+            rotation: p.rotation
+          });
+          break;
+        }
+      });
+      if (entries) persistEntries(entries);
+
+      // Give the page that just received notes the chance to place (or pass on)
+      // what it was handed. If it is off-screen it has no size yet and simply
+      // waits — it lays out the moment it is turned to.
+      if (evicted.length) {
+        requestAnimationFrame(function () {
+          relayoutPageNotes(nextPage, persist);
+        });
+      }
+    }
+
+    function relayoutAllPages(persist) {
+      if (!bookEl) return;
+      var lists = bookEl.querySelectorAll('.entries-list');
+      lists.forEach(function (list) {
+        relayoutPageNotes(Number(list.dataset.flipIndex), persist);
+      });
+    }
+
+    var pageResizeDisconnectors = [];
+
+    function bindPageResizeObservers() {
+      var NP = window.NotePlacement;
+      pageResizeDisconnectors.forEach(function (off) { off(); });
+      pageResizeDisconnectors = [];
+      if (!NP || !bookEl) return;
+      bookEl.querySelectorAll('.entries-list').forEach(function (list) {
+        var off = NP.observeContainerResize(list, function () {
+          relayoutPageNotes(Number(list.dataset.flipIndex), true);
+        });
+        pageResizeDisconnectors.push(off);
+      });
+    }
+
+    function paintEntriesOntoPages() {
+      if (!bookEl) return;
+      var lists = bookEl.querySelectorAll('.entries-list');
+      lists.forEach(function (list) { list.innerHTML = ''; });
+      /*
+       * Pack the book from the first page on every paint, ignoring whichever
+       * page a note was saved on. Everything starts on page 1; the relayout
+       * keeps what fits there and passes the rest to page 2, which passes its
+       * overflow to page 3, and so on. So notes only spill onto a later page
+       * once the earlier one is truly full — no half-empty spreads.
+       * Stable sort by saved page keeps the existing reading order.
+       */
+      var firstList = getEntriesList(1);
+      if (firstList) {
+        loadEntries()
+          .filter(isBookCoverEntry)
+          .map(function (entry, i) { return { entry: entry, i: i }; })
+          .sort(function (a, b) {
+            return ((Number(a.entry.pageIndex) || 0) - (Number(b.entry.pageIndex) || 0)) || (a.i - b.i);
+          })
+          .forEach(function (item) {
+            firstList.appendChild(createScatterNote(item.entry));
+          });
+      }
+      // Measure real sizes, place with rotated AABB, then fade in
+      requestAnimationFrame(function () {
+        relayoutAllPages(true);
+        bindPageResizeObservers();
+      });
+    }
+
+    function collectOccupiedBoxes(list) {
+      var NP = window.NotePlacement;
+      var cw = list.clientWidth;
+      var ch = list.clientHeight;
+      var notes = Array.prototype.slice.call(
+        list.querySelectorAll('.scatter-note.is-placed, .scatter-note')
+      );
+      var sizes = [];
+      var placements = [];
+      notes.forEach(function (n) {
+        if (!n.style.left && !n.style.top) return;
+        sizes.push(NP.measureUnrotatedSize(n));
+        placements.push({
+          xPercent: parseFloat(n.style.left) || 0,
+          yPercent: parseFloat(n.style.top) || 0,
+          rotation: parseFloat(n.dataset.rotation) || 0
+        });
+      });
+      return {
+        cw: cw,
+        ch: ch,
+        boxes: NP.boxesFromPlacements(sizes, placements, cw, ch)
+      };
+    }
+
+    /**
+     * Try to fit one new note on a page using real measured size + rotated AABB.
+     * Returns { note, entry, placement } or null if the page is full.
+     */
+    function tryFitNoteOnPage(pageIndex, draft) {
+      var NP = window.NotePlacement;
+      if (!NP || !isContentPage(pageIndex)) return null;
+      var list = getEntriesList(pageIndex);
+      if (!list) return null;
+
+      var occupied = collectOccupiedBoxes(list);
+      if (occupied.cw <= 0 || occupied.ch <= 0) return null;
+
+      var note = createScatterNote({
+        id: draft.id,
+        message: draft.message,
+        name: draft.name,
+        date: draft.date,
+        vibe: { rotation: draft.rotation, color: draft.color }
+      });
+      list.appendChild(note);
+      var size = NP.measureUnrotatedSize(note);
+
+      var placed = NP.tryPlaceOneNote({
+        containerWidth: occupied.cw,
+        containerHeight: occupied.ch,
+        size: size,
+        rotation: draft.rotation,
+        occupied: occupied.boxes
+      });
+
+      if (!placed) {
+        list.removeChild(note);
+        return null;
+      }
+
+      applyPlacementToNote(note, placed.placement);
+      revealNote(note);
+
+      var entry = {
+        id: draft.id,
+        message: draft.message,
+        name: draft.name,
+        date: draft.date,
+        pageIndex: pageIndex,
+        vibe: {
+          font: 'Ugly Dave',
+          color: draft.color,
+          rotation: placed.placement.rotation,
+          weight: 400,
+          fontSize: 14,
+          top: placed.placement.yPercent.toFixed(2) + '%',
+          left: placed.placement.xPercent.toFixed(2) + '%'
+        },
+        source: 'book-cover'
+      };
+
+      var entries = loadEntries();
+      var replaced = false;
+      for (var i = 0; i < entries.length; i++) {
+        if (entries[i].id === entry.id) {
+          entries[i] = entry;
+          replaced = true;
+          break;
+        }
+      }
+      if (!replaced) entries.push(entry);
+      persistEntries(entries);
+      syncEntryToCloud(entry);
+
+      return { note: note, entry: entry, placement: placed.placement, pageIndex: pageIndex };
+    }
+
+    /** Force-place via full relayout (grid fallback) when a page must accept the note. */
+    function forcePlaceOnPage(pageIndex, draft) {
+      var list = getEntriesList(pageIndex);
+      if (!list || !isContentPage(pageIndex)) return null;
+
+      var note = createScatterNote({
+        id: draft.id,
+        message: draft.message,
+        name: draft.name,
+        date: draft.date,
+        vibe: { rotation: draft.rotation, color: draft.color }
+      });
+      list.appendChild(note);
+
+      var entry = {
+        id: draft.id,
+        message: draft.message,
+        name: draft.name,
+        date: draft.date,
+        pageIndex: pageIndex,
+        vibe: {
+          font: 'Ugly Dave',
+          color: draft.color,
+          rotation: draft.rotation,
+          weight: 400,
+          fontSize: 14,
+          top: '12%',
+          left: '12%'
+        },
+        source: 'book-cover'
+      };
+      var entries = loadEntries();
+      entries.push(entry);
+      persistEntries(entries);
+      syncEntryToCloud(entry);
+
+      relayoutPageNotes(pageIndex, true);
+      revealNote(note);
+      return { note: note, entry: entry, pageIndex: pageIndex };
+    }
+
+    function ensurePageVisible(pageIndex) {
+      if (!pageFlip || !isContentPage(pageIndex)) return;
+      var current = pageFlip.getCurrentPageIndex();
+      // For a right page R, turn to R; for left L, turn to L (shows L|L+1)
+      var turnTo = pageIndex;
+      if (turnTo === current) return;
+      try {
+        if (Math.abs(turnTo - current) === 1) {
+          if (turnTo > current) pageFlip.flipNext();
+          else pageFlip.flipPrev();
+        } else {
+          pageFlip.turnToPage(turnTo);
+        }
+      } catch (_e) {
+        try { pageFlip.turnToPage(turnTo); } catch (_e2) {}
+      }
+    }
+
+    /*
+     * The two pages currently on screen.
+     *
+     * StPageFlip's real spreads (showCover, landscape) are (1|2), (3|4), (5|6):
+     * the ODD page is the LEFT leaf and the even one the right. The earlier
+     * helpers above assume the opposite (an odd page as a lone right leaf), so
+     * they never tried the right leaf before turning the page. This reads the
+     * spread straight from the book's current index instead.
+     */
+    function currentSpreadLeaves() {
+      var cur = pageFlip ? pageFlip.getCurrentPageIndex() : 1;
+      var left = cur % 2 === 1 ? cur : cur - 1;
+      if (left < 1) left = 1;
+      return [left, left + 1].filter(isContentPage);
+    }
+
+    /*
+     * Put a note on the open spread: LEFT page first; if it has no room, the
+     * RIGHT page; only when neither can take it, turn the page and try the next
+     * spread. It keeps turning until something has space — stacking it on top of
+     * existing notes is the last resort, when the book has no pages left.
+     */
+    /** Highest page holding any note — where the book's writing currently ends. */
+    function lastFilledPage() {
+      var last = 1;
+      if (!bookEl) return last;
+      bookEl.querySelectorAll('.entries-list').forEach(function (list) {
+        var idx = Number(list.dataset.flipIndex);
+        if (idx > last && list.querySelector('.scatter-note')) last = idx;
+      });
+      return last;
+    }
+
+    function placeOnSpreadOrFlip(draft, attempt, done) {
+      done = done || function () {};
+      var leaves = currentSpreadLeaves();
+      /*
+       * A new note continues where the writing ends, not on whatever spread the
+       * visitor has flipped to — otherwise it lands on a blank spread ahead of
+       * (or a full one behind) the last notes and leaves gaps in the book.
+       */
+      if (attempt === 0 && pageFlip) {
+        var frontier = lastFilledPage();
+        var frontierLeft = frontier % 2 === 1 ? frontier : frontier - 1;
+        if (leaves.length && leaves[0] !== frontierLeft && isContentPage(frontierLeft)) {
+          try { pageFlip.flip(frontierLeft); } catch (_e) { pageFlip.turnToPage(frontierLeft); }
+          var wait = prefersReducedMotion.matches ? 0 : FLIPPING_TIME + 60;
+          setTimeout(function () { placeOnSpreadOrFlip(draft, 1, done); }, wait);
+          return null;
+        }
+      }
+      for (var i = 0; i < leaves.length; i++) {
+        var fitted = tryFitNoteOnPage(leaves[i], draft);
+        if (fitted) { done(); return fitted; }
+      }
+      var nextLeft = leaves.length ? leaves[0] + 2 : null;
+      if (nextLeft != null && isContentPage(nextLeft) && attempt < 40 && pageFlip) {
+        try { pageFlip.flipNext(); } catch (_e) { done(); return forcePlaceOnPage(leaves[leaves.length - 1], draft); }
+        var delay = prefersReducedMotion.matches ? 0 : FLIPPING_TIME + 60;
+        setTimeout(function () { placeOnSpreadOrFlip(draft, attempt + 1, done); }, delay);
+        return null;
+      }
+      done();
+      return forcePlaceOnPage(leaves.length ? leaves[leaves.length - 1] : 1, draft);
+    }
+
+    /*
+     * One placement at a time. A placement can wait out page turns, and two
+     * running at once each turned the book on their own — notes skipped whole
+     * spreads. Later notes wait for the one before them to land.
+     */
+    var placementQueue = [];
+    var placementBusy = false;
+    function runNextPlacement() {
+      if (placementBusy || !placementQueue.length) return;
+      placementBusy = true;
+      var draft = placementQueue.shift();
+      placeOnSpreadOrFlip(draft, 0, function () {
+        placementBusy = false;
+        runNextPlacement();
+      });
+    }
+
+    /**
+     * Place on the open spread (left, then right) → only flip when both sides
+     * are full.
+     */
+    function placeEntryWithOverflow(message, name) {
+      var id = (typeof crypto !== 'undefined' && crypto.randomUUID)
+        ? crypto.randomUUID()
+        : Date.now().toString(36) + Math.random().toString(36).slice(2);
+
+      var draft = {
+        id: id,
+        message: message,
+        name: String(name || '').trim() || '—',
+        date: getTodayStamp(),
+        rotation: Math.random() * 14 - 7,
+        color: NOTE_COLORS[Math.floor(Math.random() * NOTE_COLORS.length)]
+      };
+
+      placementQueue.push(draft);
+      runNextPlacement();
+    }
+
+    function clearNameHintTimer() {
+      clearTimeout(nameHintTimer);
+      nameHintTimer = null;
+    }
+
+    function setNameHint(on) {
+      nameHinted = !!on;
+      messageForm.classList.toggle('is-hinted', nameHinted);
+      if (nameSlot) nameSlot.setAttribute('aria-hidden', nameHinted ? 'false' : 'true');
+      if (nameInput) nameInput.tabIndex = nameHinted ? 0 : -1;
+      if (!nameHinted && nameInput) nameInput.value = '';
+    }
+
+    function scheduleNameHint() {
+      clearNameHintTimer();
+      nameHintTimer = setTimeout(function () {
+        nameHintTimer = null;
+        if (phase !== 'open' && phase !== 'opening') return;
+        if (!messageInput.value.trim()) return;
+        setNameHint(true);
+      }, NAME_HINT_MS);
+    }
+
+    function syncMessageMirror() {
+      var raw = messageInput.value;
+      var empty = raw.length === 0;
+      var canSend = !!raw.trim();
+      var focused = messageForm.classList.contains('is-focused');
+      messageForm.classList.toggle('is-empty', empty);
+      messageForm.classList.toggle('is-ready', canSend);
+      messageMirror.classList.toggle('is-empty', empty);
+      /* Placeholder only when idle+empty; hide on focus so caret is left-most */
+      messageMirrorText.textContent = empty
+        ? (focused ? '' : PLACEHOLDER)
+        : raw;
+      messageSend.disabled = !canSend;
+      messageSend.classList.toggle('is-ready', canSend);
+    }
+
+    function resetMessageField() {
+      clearNameHintTimer();
+      setNameHint(false);
+      messageInput.value = '';
+      if (nameInput) nameInput.value = '';
+      syncMessageMirror();
+      messageForm.classList.remove('is-focused');
+    }
+
+    function scheduleMessageInputShow() {
+      clearTimeout(inputShowTimer);
+      var delay = prefersReducedMotion.matches ? 0 : INPUT_SHOW_DELAY_MS;
+      inputShowTimer = setTimeout(function () {
+        if (phase !== 'opening' && phase !== 'open') return;
+        messageDock.classList.add('is-visible');
+        messageDock.setAttribute('aria-hidden', 'false');
+      }, delay);
+    }
+
+    function hideMessageInput() {
+      clearTimeout(inputShowTimer);
+      clearNameHintTimer();
+      messageDock.classList.remove('is-visible');
+      messageDock.setAttribute('aria-hidden', 'true');
+      resetMessageField();
+    }
+
+    function commitMessage() {
+      if (phase !== 'open' && phase !== 'opening') return;
+      var raw = String(messageInput.value || '').trim();
+      var cleaned = sanitizeEnglishOnly(messageInput.value).trim();
+      if (!cleaned) {
+        // Typing something the book cannot letter used to clear the field and
+        // drop the message without a word. Keep the text and explain instead.
+        if (raw) {
+          showMessageError(UNSUPPORTED_MSG);
+          return;
+        }
+        resetMessageField();
+        return;
+      }
+
+      var name = sanitizeEnglishOnly(nameInput ? nameInput.value : '').trim();
+
+      if (window.ProfanityFilter) {
+        var gate = ProfanityFilter.checkProfanity(cleaned, name);
+        if (!gate.ok) {
+          showMessageError(gate.reason);
+          return;
+        }
+      }
+
+      clearMessageError();
+      placeEntryWithOverflow(cleaned, name);
+      resetMessageField();
+    }
+
+    /** Unclip stage while hard cover flaps open/closed */
+    function setCoverFlipping(active) {
+      document.body.classList.toggle('is-cover-flipping', active);
+    }
+
+    /** Click-open stage — right-page notebook art + spine-square radii */
+    function setBookOpening(active) {
+      document.body.classList.toggle('is-book-opening', active);
+    }
+
+    /**
+     * Reveal/hide the split open-spread on #open-staging (is-notebook).
+     * For initial open: call ONLY when the cover flap lands (see flip handler).
+     * Decode is pre-warmed offscreen via warmNotebookBackground / #notebook-paint-warm.
+     */
+    function setNotebookVisible(on) {
+      bookWrapper.classList.toggle('is-notebook', on);
+      if (!on) bookWrapper.classList.remove('is-hiding-left');
+    }
+
+    /** Clear left half immediately so cover can flap closed without fighting bg */
+    function hideLeftNotebook() {
+      bookWrapper.classList.add('is-hiding-left');
+    }
+
+    /**
+     * Cover 0→1 open just finished — show BOTH OpenNotebookLeft + Right
+     * in this same callback frame (no setTimeout). Opening flag off; staging
+     * stays via is-notebook. Idempotent; only acts while opening.
+     */
+    function revealNotebookOnCoverLand() {
+      if (phase !== 'opening') return;
+      clearTimeout(openTimer);
+      phase = 'open';
+      setBookOpening(false);
+      setCoverFlipping(false);
+      bookWrapper.classList.remove('is-hiding-left');
+      setNotebookVisible(true);
+    }
+
+    /** Decode-safe preload — decodeURI for spaces; resolve after decode when possible */
+    function preloadImage(src) {
+      return new Promise(function (resolve) {
+        var img = new Image();
+        var finish = function () { resolve(img); };
+        var afterLoad = function () {
+          if (typeof img.decode === 'function') {
+            img.decode().then(finish).catch(finish);
+          } else {
+            finish();
+          }
+        };
+        img.onload = afterLoad;
+        img.onerror = finish;
+        img.src = src;
+      });
+    }
+
+    /** Wait until PageFlip cover/back imgs have painted pixels */
+    function waitForBookImages() {
+      var imgs = bookEl.querySelectorAll('img');
+      if (!imgs.length) return Promise.resolve();
+      return Promise.all(
+        Array.prototype.map.call(imgs, function (img) {
+          if (img.complete && img.naturalWidth > 0) {
+            return typeof img.decode === 'function'
+              ? img.decode().catch(function () {})
+              : Promise.resolve();
+          }
+          return new Promise(function (resolve) {
+            var done = function () { resolve(); };
+            img.addEventListener('load', done, { once: true });
+            img.addEventListener('error', done, { once: true });
+          });
+        })
+      );
+    }
+
+    /**
+     * Warm Cover / Back / open-spread halves (decode + CSS paint) before any click.
+     * Halves are ~6–10KB WebP at display size — still warm so open never
+     * waits on a cold background-image decode mid-flip.
+     */
+    function setCssUrlVar(name, src) {
+      document.documentElement.style.setProperty(
+        name,
+        'url("' + src.replace(/"/g, '\\"') + '")'
+      );
+    }
+
+    /**
+     * Prefer .webp; fall back to .png if webp fails to decode.
+     * Sets the given CSS custom property for staging / warm paint.
+     */
+    function resolveNotebookHalf(webpSrc, pngSrc, cssVar) {
+      return preloadImage(webpSrc).then(function (img) {
+        if (img && img.naturalWidth > 0) {
+          setCssUrlVar(cssVar, webpSrc);
+          return webpSrc;
+        }
+        return preloadImage(pngSrc).then(function () {
+          setCssUrlVar(cssVar, pngSrc);
+          return pngSrc;
+        });
+      });
+    }
+
+    function resolveNotebookLeftAsset() {
+      return resolveNotebookHalf(
+        ASSETS.notebookLeft,
+        ASSETS.notebookLeftPng,
+        '--open-notebook-left-img'
+      );
+    }
+
+    function resolveNotebookRightAsset() {
+      return resolveNotebookHalf(
+        ASSETS.notebookRight,
+        ASSETS.notebookRightPng,
+        '--open-notebook-right-img'
+      );
+    }
+
+    function warmNotebookBackground() {
+      if (!document.documentElement.style.getPropertyValue('--open-notebook-left-img')) {
+        setCssUrlVar('--open-notebook-left-img', ASSETS.notebookLeft);
+      }
+      if (!document.documentElement.style.getPropertyValue('--open-notebook-right-img')) {
+        setCssUrlVar('--open-notebook-right-img', ASSETS.notebookRight);
+      }
+      // #notebook-paint-warm already paints both halves offscreen via CSS vars
+    }
+
+    function preloadOpenAssets() {
+      if (assetsPromise) return assetsPromise;
+      // Only the two hard covers are bitmaps now — the spread is CSS, so the
+      // first open no longer blocks on decoding two full-page images.
+      assetsPromise = Promise.all([
+        preloadImage(ASSETS.cover),
+        preloadImage(ASSETS.back)
+      ]).then(function () {
+        assetsReady = true;
+      });
+      return assetsPromise;
+    }
+
+    // Start immediately on parse — do not wait for click
+    preloadOpenAssets();
+
+    /**
+     * One page size for closed CSS cover and PageFlip pages.
+     * Stage is always 2×pageWidth × pageHeight, spine-centered.
+     */
+    function applyBookSize() {
+      var maxSpreadW = Math.min(window.innerWidth * 0.92, 900);
+      var maxH = Math.min(window.innerHeight * 0.72, 640);
+
+      var pageWidth = Math.min(Math.floor(maxSpreadW / 2), 440);
+      var pageHeight = Math.round(pageWidth * PAGE_ASPECT);
+
+      if (pageHeight > maxH) {
+        pageHeight = Math.floor(maxH);
+        pageWidth = Math.round(pageHeight / PAGE_ASPECT);
+      }
+
+      // Keep depth roughly proportional on small screens
+      var depth = pageWidth < 220 ? 22 : 28;
+
+      document.documentElement.style.setProperty('--book-w', pageWidth + 'px');
+      document.documentElement.style.setProperty('--book-h', pageHeight + 'px');
+      document.documentElement.style.setProperty('--book-depth', depth + 'px');
+
+      bookSize = { pageWidth: pageWidth, pageHeight: pageHeight };
+      return bookSize;
+    }
+
+    applyBookSize();
+
+    function hardCover(src, alt, isFront) {
+      var page = document.createElement('div');
+      page.className = 'page page--hard-cover' + (isFront ? ' page--hard-front' : '');
+      page.dataset.density = 'hard';
+      /*
+       * Front art + solid pink (#FF53C4) verso panel (no paper layer).
+       * Note: during open curl PageFlip also pairs page index 1 as the
+       * hard-board backface — that leaf is painted pink via CSS
+       * (body.is-book-opening .page--opening-right).
+       */
+      page.innerHTML =
+        '<div class="cover-front">' +
+          '<img class="cover-img" src="' + src + '" alt="' + alt + '" ' +
+            'onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'block\'" />' +
+          '<div class="cover-placeholder" aria-hidden="true"></div>' +
+        '</div>' +
+        '<div class="cover-verso" aria-hidden="true"></div>';
+      return page;
+    }
+
+    function notebookPage(isLeft, isOpeningRight, flipIndex) {
+      var page = document.createElement('div');
+      /*
+       * showCover: page index 1 is the first RIGHT leaf under the cover.
+       * Remaining inners alternate left/right for spreads.
+       */
+      page.className = 'page ' + (isLeft ? '--left' : '--right');
+      if (isOpeningRight) page.classList.add('page--opening-right');
+
+      var inner = document.createElement('div');
+      inner.className = 'entry-page-inner';
+
+      var ruled = document.createElement('div');
+      ruled.className = 'ruled-lines';
+      inner.appendChild(ruled);
+
+      var list = document.createElement('div');
+      list.className = 'entries-list';
+      list.dataset.flipIndex = String(flipIndex);
+      inner.appendChild(list);
+
+      page.appendChild(inner);
+
+      /*
+       * Gutter shade hugs the SPINE. Real spreads are (1|2), (3|4)…, so odd
+       * pages are left leaves (spine on their right) — not what `isLeft` above
+       * says. With the shade on the outer edge instead, a lifting page was
+       * darkest at its corner tip and faded toward the fold: mirrored.
+       */
+      var crease = document.createElement('div');
+      crease.className = 'page-crease ' + (flipIndex % 2 === 1 ? 'right' : 'left');
+      page.appendChild(crease);
+
+      return page;
+    }
+
+    function buildPages() {
+      var pages = [];
+      pages.push(hardCover(ASSETS.cover, 'Cover', true));
+
+      var innerCount = INNER_SPREADS * 2;
+      for (var i = 0; i < innerCount; i++) {
+        // showCover: first content page (i=0, index 1) is RIGHT of the spine
+        var isLeft = i % 2 !== 0;
+        var flipIndex = i + 1; // PageFlip index (0 = cover)
+        pages.push(notebookPage(isLeft, i === 0, flipIndex));
+      }
+
+      pages.push(hardCover(ASSETS.back, 'Back Cover', false));
+      return pages;
+    }
+
+    function updateBookBackground(currentPageIndex) {
+      var lastIndex = Math.max(0, totalPageCount - 1);
+      var onInner = currentPageIndex > 0 && currentPageIndex < lastIndex;
+      /*
+       * Initial cover open: stay hidden while phase==='opening'.
+       * Notebook becomes visible only in revealNotebookOnCoverLand()
+       * (pageFlip 'flip' when 0→1 completes — same frame, zero delay).
+       * After land, do not strip on a stale page-0 changeState — the flip
+       * handler clears notebook explicitly when the user returns to cover.
+       */
+      if (phase === 'opening') {
+        setNotebookVisible(false);
+        return;
+      }
+      if (phase === 'open' && currentPageIndex === 0) {
+        return;
+      }
+      setNotebookVisible(
+        (phase === 'open' || phase === 'closing') && onInner
+      );
+    }
+
+    function destroyPageFlip() {
+      if (pageFlip) {
+        try { pageFlip.destroy(); } catch (_e) {}
+        pageFlip = null;
+      }
+      bookEl.innerHTML = '';
+      bookWrapper.classList.remove('is-notebook', 'is-hiding-left');
+      setCoverFlipping(false);
+      setBookOpening(false);
+    }
+
+    function initPageFlip() {
+      destroyPageFlip();
+
+      var size = applyBookSize();
+      var pages = buildPages();
+      totalPageCount = pages.length;
+      pages.forEach(function (p) { bookEl.appendChild(p); });
+
+      pageFlip = new St.PageFlip(bookEl, {
+        width: size.pageWidth,
+        height: size.pageHeight,
+        size: 'fixed',
+        minWidth: size.pageWidth,
+        maxWidth: size.pageWidth,
+        minHeight: size.pageHeight,
+        maxHeight: size.pageHeight,
+        /* No gray slab / hard shadow bars */
+        /* Soft curl shadows on. The gray slab this originally suppressed comes
+           from the *hard* shadow layers, which stay killed in CSS below — those
+           are separate from the soft page shadows that give the turn its depth.
+           The engine's own demo runs at 0.5, which reads as a heavy grey wash
+           on cream paper; this is a quarter of that — just enough for a turning
+           page to sit above the one under it. */
+        maxShadowOpacity: 0.12,
+        /* Cover open/close curl — keep in sync with FLIPPING_TIME */
+        flippingTime: FLIPPING_TIME,
+        startPage: 0,
+        showCover: true,
+        usePortrait: false,
+        mobileScrollSupport: false,
+        useMouseEvents: true,
+        drawShadow: true,
+        /* No corner peek when the cursor hovers a page edge — pages only turn
+           on click, drag or the arrow keys. */
+        showPageCorners: false,
+        // Keep geometry locked to our stage; CSS forces 100% fill
+        autoSize: false
+      });
+
+      pageFlip.loadFromHTML(bookEl.querySelectorAll('.page'));
+      paintEntriesOntoPages();
+
+      /*
+       * PRIMARY HOOK — pageFlip.on('flip'):
+       * Fires when the animated page turn completes and the current index
+       * updates (before changeState → 'read'). For initial open (0→1), this
+       * is the exact land frame for both open-spread halves (zero delay).
+       */
+      pageFlip.on('flip', function (e) {
+        if (phase === 'opening' && e.data > 0) {
+          revealNotebookOnCoverLand();
+          return;
+        }
+
+        if (phase === 'open' && e.data === 0) {
+          // User flipped back to cover — restore Vault CSS book
+          setCoverFlipping(false);
+          setNotebookVisible(false);
+          closeToCssBook();
+          return;
+        }
+        if (phase === 'closing' && e.data === 0) {
+          setCoverFlipping(false);
+          setNotebookVisible(false);
+          finishClose();
+          return;
+        }
+
+        if (phase !== 'opening') {
+          updateBookBackground(e.data);
+        }
+      });
+
+      /*
+       * BACKUP HOOK — pageFlip.on('changeState'):
+       * Animation end sets state to 'read' after turnToNextPage. If still
+       * opening and index > 0, reveal notebook in this same frame.
+       * Close-to-cover: as soon as BACK flip/fold starts from page 1,
+       * hide OpenNotebookLeft so the cover flap has a clear left half.
+       */
+      pageFlip.on('changeState', function (e) {
+        if (!pageFlip) return;
+        var state = e && e.data;
+        var idx = pageFlip.getCurrentPageIndex();
+
+        if (state === 'flipping' || state === 'user_fold') {
+          setCoverFlipping(true);
+          /*
+           * Tell the host a page is turning so it can play the sheet sound.
+           * Only while 'open': the cover's own flips at either end of the
+           * sequence already have the book-open / book-close sound on them.
+           */
+          if (phase === 'open' && state === 'flipping') {
+            try {
+              window.parent.postMessage({ source: 'guestbook-book', type: 'flip' }, '*');
+            } catch (_e) {}
+          }
+          // PageFlip: direction 1 = BACK (left half / toward previous / cover)
+          if ((phase === 'open' || phase === 'closing') && idx === 1) {
+            try {
+              var dir = pageFlip.getRender().getDirection();
+              if (dir === 1) hideLeftNotebook();
+            } catch (_e) {
+              hideLeftNotebook();
+            }
+          }
+          return;
+        }
+
+        if (state === 'read') {
+          if (phase === 'opening' && idx > 0) {
+            revealNotebookOnCoverLand();
+            return;
+          }
+          if (phase === 'open') {
+            setCoverFlipping(false);
+            // Cancelled fold toward cover — restore left half
+            if (idx > 0) bookWrapper.classList.remove('is-hiding-left');
+          }
+        }
+
+        // Skip during opening; after land, skip page 0 so we don't strip
+        if (phase !== 'opening' && !(phase === 'open' && idx === 0)) {
+          updateBookBackground(idx);
+        }
+      });
+
+      // Cover page 0 — split spread hidden (halves already warmed offscreen)
+      setNotebookVisible(false);
+      bindCoverGuard();
+    }
+
+    /*
+     * The two hard covers are in the deck because the open and close flips are
+     * cover flips — but they are not somewhere a reader should be able to land.
+     * Flipping back off the first spread would show the front cover's verso and
+     * close the book out from under them; flipping forward off the last would
+     * show the back cover. Both are swallowed here.
+     *
+     * Capture phase on #book-wrapper: PageFlip binds its own handlers on #book,
+     * one level down, so stopping the event on the wrapper reaches it first and
+     * kills the click-to-flip and the drag-fold together. Programmatic flips
+     * (the open curl, the dismiss) never come through here, so they still run.
+     */
+    function guardCoverFlip(e) {
+      if (phase !== 'open' || !pageFlip) return;
+      var box = bookEl.getBoundingClientRect();
+      if (!(box.width > 0)) return;
+      var point = e.touches && e.touches[0] ? e.touches[0] : e;
+      var x = point.clientX;
+      if (typeof x !== 'number') return;
+
+      var towardsCover = (x - box.left) < box.width / 2;
+      var idx = pageFlip.getCurrentPageIndex();
+      // 0 is the front cover; totalPageCount - 1 is the back one.
+      var blocked = towardsCover ? idx <= 1 : idx >= totalPageCount - 3;
+      if (!blocked) return;
+      e.stopPropagation();
+      if (e.cancelable) e.preventDefault();
+    }
+
+    var coverGuardBound = false;
+    function bindCoverGuard() {
+      if (coverGuardBound || !bookWrapper) return;
+      coverGuardBound = true;
+      ['mousedown', 'touchstart', 'click'].forEach(function (type) {
+        bookWrapper.addEventListener(type, guardCoverFlip, true);
+      });
+    }
+
+    /**
+     * Open = mirror of close:
+     * CSS cover → PageFlip cover (page 0) → flipNext to page 1.
+     * No scale enter. Frost fades in alongside the cover curl.
+     * OpenNotebookRight shows during the flap; Left+Right reveal on land
+     * in the 'flip' callback (same frame).
+     */
+    function revealOpenBook() {
+      if (phase !== 'opening') return;
+
+      bookWrapper.classList.remove('is-visible');
+      // Measure under the still-visible CSS cover (opacity 0, visibility on)
+      bookWrapper.style.visibility = 'visible';
+
+      try {
+        initPageFlip(); // startPage 0 — cover, matching CSS book
+      } catch (err) {
+        console.error(err);
+        bookWrapper.style.visibility = '';
+        finishClose();
+        return;
+      }
+
+      waitForBookImages().then(function () {
+        if (phase !== 'opening') return;
+        bookWrapper.style.visibility = '';
+
+        // Seamless handoff: hide CSS cover + show PageFlip cover together
+        closedWrap.classList.remove('is-closed');
+        closedWrap.classList.add('is-hidden', 'is-swap');
+        setFrostActive(true);
+        // Input fade begins at 50% of frost enter (200ms of 400ms)
+        scheduleMessageInputShow();
+        bookWrapper.classList.add('is-visible');
+
+        // Left half stays hidden until flap lands; right via
+        // is-book-opening — visible as soon as this wrapper appears.
+        setNotebookVisible(false);
+        setCoverFlipping(true);
+        setBookOpening(true);
+
+        requestAnimationFrame(function () {
+          requestAnimationFrame(function () {
+            if (phase !== 'opening' || !pageFlip) return;
+
+            if (prefersReducedMotion.matches) {
+              pageFlip.turnToPage(1);
+              revealNotebookOnCoverLand();
+              return;
+            }
+
+            // Hold on the closed cover for a beat, then turn it. Parked on
+            // openTimer so a dismiss during the beat cancels it; the safety
+            // timer below takes the slot back once the flip is under way.
+            openTimer = setTimeout(function () {
+              if (phase !== 'opening' || !pageFlip) return;
+
+              try {
+                // Curl only — both halves reveal on 'flip' when 0→1 lands
+                pageFlip.flipNext();
+              } catch (_e) {
+                pageFlip.turnToPage(1);
+                revealNotebookOnCoverLand();
+                return;
+              }
+
+              // Safety if flip/changeState never fire
+              openTimer = setTimeout(function () {
+                if (phase === 'opening') revealNotebookOnCoverLand();
+              }, FLIPPING_TIME + 80);
+            }, OPEN_FLIP_DELAY);
+          });
+        });
+      });
+    }
+
+    function openBook() {
+      if (phase !== 'closed') return;
+      phase = 'opening';
+      setBookOpening(true);
+      clearTimeout(openTimer);
+
+      if (assetsReady) {
+        revealOpenBook();
+      } else {
+        preloadOpenAssets().then(function () {
+          if (phase === 'opening') revealOpenBook();
+        });
+      }
+    }
+
+    function finishClose() {
+      clearTimeout(openTimer);
+      phase = 'closing';
+      // Input exits with / before frost out
+      hideMessageInput();
+      // Fade PageFlip out + frost off after cover is showing; restore CSS book
+      bookWrapper.classList.remove('is-visible');
+      setFrostActive(false);
+
+      openTimer = setTimeout(function () {
+        destroyPageFlip();
+        closedWrap.classList.remove('is-hidden', 'is-opening', 'is-swap');
+        closedWrap.classList.add('is-closed');
+        phase = 'closed';
+        cssBook.focus({ preventScroll: true });
+      }, 210);
+    }
+
+    function closeToCssBook() {
+      if (phase !== 'open') return;
+      phase = 'closing';
+      hideMessageInput();
+      // Brief beat so the cover flip can settle, then swap back
+      setTimeout(finishClose, 200);
+    }
+
+    /** Click frost / Esc — same dismiss pattern as envelope letter overlay */
+    function dismissFromOverlay() {
+      if (phase === 'opening') {
+        clearTimeout(openTimer);
+        hideMessageInput();
+        finishClose();
+        return;
+      }
+      if (phase !== 'open') return;
+
+      phase = 'closing';
+      hideMessageInput();
+      // Clear left half immediately so cover flap isn’t fighting OpenNotebookLeft
+      hideLeftNotebook();
+      if (pageFlip && pageFlip.getCurrentPageIndex() > 0) {
+        try {
+          setCoverFlipping(true);
+          pageFlip.flip(0);
+        } catch (_e) {
+          finishClose();
+          return;
+        }
+        // Safety if flip event never fires
+        setTimeout(function () {
+          if (phase === 'closing') finishClose();
+        }, 900);
+      } else {
+        finishClose();
+      }
+    }
+
+    cssBook.addEventListener('click', openBook);
+    cssBook.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        openBook();
+      }
+    });
+
+    frostEl.addEventListener('click', dismissFromOverlay);
+    frostEl.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        dismissFromOverlay();
+      }
+    });
+
+    messageInput.addEventListener('input', function () {
+      // Folding is invisible repair (curly quote -> straight) and must stay
+      // silent; only a character the book truly cannot letter warrants a word.
+      var folded = foldPunctuation(messageInput.value);
+      var cleaned = folded.replace(ENGLISH_ONLY_RE, '').slice(0, 120);
+      if (cleaned !== messageInput.value) messageInput.value = cleaned;
+      if (ENGLISH_ONLY_TEST.test(folded)) showMessageError(UNSUPPORTED_MSG);
+      else clearMessageError();
+      syncMessageMirror();
+      /*
+       * Name row opens on the first keystroke, no waiting. It used to be on a
+       * timer — originally re-armed on every keystroke, so it waited for the
+       * typing to stop; then a fixed beat from the first one. Both left a gap
+       * between starting to type and the field appearing. Its 180ms grid/
+       * opacity transition is still what you see, so it grows in rather than
+       * snapping.
+       */
+      if (nameHinted) return;
+      clearNameHintTimer();
+      if (messageInput.value.trim()) setNameHint(true);
+    });
+
+    if (nameInput) {
+      nameInput.addEventListener('input', function () {
+        var cleaned = sanitizeEnglishOnly(nameInput.value).slice(0, 40);
+        if (cleaned !== nameInput.value) nameInput.value = cleaned;
+      });
+    }
+
+    messageInput.addEventListener('focus', function () {
+      messageForm.classList.add('is-focused');
+      syncMessageMirror();
+    });
+
+    messageInput.addEventListener('blur', function () {
+      messageForm.classList.remove('is-focused');
+      syncMessageMirror();
+    });
+
+    messageForm.addEventListener('click', function (e) {
+      if (e.target === nameInput || (nameInput && nameInput.contains(e.target))) return;
+      if (e.target.closest && e.target.closest('.message-send')) return;
+      messageInput.focus();
+    });
+
+    messageForm.addEventListener('submit', function (e) {
+      e.preventDefault();
+      commitMessage();
+    });
+
+    messageSend.addEventListener('mouseenter', function () {
+      if (!messageSend.classList.contains('is-ready')) return;
+      messageSend.classList.add('is-animating');
+    });
+    messageSend.addEventListener('mouseleave', function () {
+      messageSend.classList.remove('is-animating');
+    });
+
+    // Stop frost-dismiss when interacting with the dock
+    messageDock.addEventListener('click', function (e) {
+      e.stopPropagation();
+    });
+
+    function typingInField() {
+      var el = document.activeElement;
+      if (!el) return false;
+      var tag = (el.tagName || '').toLowerCase();
+      return tag === 'input' || tag === 'textarea' || el.isContentEditable;
+    }
+
+    /**
+     * Arrow-key page turns while the book is open. Left on the first spread
+     * posts a toast to the host (same bottom toast as "Email copied") instead
+     * of curling back onto the cover.
+     */
+    function flipByKey(dir) {
+      if (phase !== 'open' || !pageFlip) return;
+      var idx = pageFlip.getCurrentPageIndex();
+      if (dir === 'prev') {
+        if (idx <= 1) {
+          try {
+            window.parent.postMessage({
+              source: 'guestbook-book',
+              type: 'toast',
+              message: "You've reached the first page of the guestbook",
+            }, '*');
+          } catch (_e) {}
+          return;
+        }
+        try { pageFlip.flipPrev(); } catch (_e2) {}
+        return;
+      }
+      if (dir === 'next') {
+        // Same edge as guardCoverFlip — don't land on the hard back cover.
+        if (idx >= totalPageCount - 3) {
+          try {
+            window.parent.postMessage({
+              source: 'guestbook-book',
+              type: 'toast',
+              message: "You've reached the last page of the guestbook",
+            }, '*');
+          } catch (_e4) {}
+          return;
+        }
+        try { pageFlip.flipNext(); } catch (_e3) {}
+      }
+    }
+
+    window.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') {
+        dismissFromOverlay();
+        return;
+      }
+      if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+      if (typingInField()) return;
+      e.preventDefault();
+      flipByKey(e.key === 'ArrowLeft' ? 'prev' : 'next');
+    });
+
+    // The key caps in the hint are clickable too.
+    document.querySelectorAll('.page-turn-hint__key[data-flip]').forEach(function (btn) {
+      btn.addEventListener('click', function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        flipByKey(btn.dataset.flip);
+        // Mouse clicks drop focus so a later arrow-key press doesn't ring the cap.
+        if (e.detail > 0) btn.blur();
+      });
+    });
+
+    // The esc cap closes the book, same as the Escape key.
+    document.querySelectorAll('.page-turn-hint__key[data-close]').forEach(function (btn) {
+      btn.addEventListener('click', function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        if (typeof window.__guestbookAnnounceClosing === 'function') {
+          window.__guestbookAnnounceClosing();
+        }
+        dismissFromOverlay();
+      });
+    });
+
+    // Host forwards arrows when the parent page has focus (iframe often doesn't).
+    window.__guestbookFlipByKey = flipByKey;
+
+    syncMessageMirror();
+
+    // Pull shared notes from cloud when deployed (no-op / local on file:// & localhost)
+    if (window.GuestbookApi) {
+      GuestbookApi.fetchEntries().then(function () {
+        if ((phase === 'open' || phase === 'opening') && pageFlip) {
+          paintEntriesOntoPages();
+        }
+      });
+    }
+
+    var resizeTimer;
+    window.addEventListener('resize', function () {
+      clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(function () {
+        var prevW = bookSize.pageWidth;
+        var prevH = bookSize.pageHeight;
+        var next = applyBookSize();
+        if (prevW === next.pageWidth && prevH === next.pageHeight) return;
+
+        if ((phase === 'open' || phase === 'opening') && pageFlip) {
+          var idx = pageFlip.getCurrentPageIndex();
+          initPageFlip();
+          if (idx > 0 && pageFlip) {
+            pageFlip.turnToPage(idx);
+            updateBookBackground(idx);
+          }
+        }
+      }, 200);
+    });
+  </script>
+
+<script>
+/* Bridge to the Website26 footer host: report open/close, accept a close request.
+   `is-book-open` is toggled on <body> by setFrostActive(). */
+(function () {
+  var SRC = 'guestbook-book';
+  // Hosted in an iframe — let the parent page show through the frost.
+  if (window.parent !== window) document.documentElement.classList.add('is-embed');
+  function post(type) {
+    try { parent.postMessage({ source: SRC, type: type }, '*'); } catch (e) {}
+  }
+
+  /*
+   * Host-driven hover peek: the footer opens the flap in step with its dot
+   * shapes and closes it as they return to dots. Same pose as :hover (via
+   * .is-peek); only the timing is the host's — opening eases out over the
+   * shapes' form time, closing eases in-out over their (quicker) return. The
+   * inline transitions are cleared afterwards so a real hover feels as before.
+   */
+  var PEEK_OPEN = 'cubic-bezier(0.23, 1, 0.32, 1)';
+  var PEEK_CLOSE = 'cubic-bezier(0.77, 0, 0.175, 1)';
+  var peekTimer = 0;
+  function peek(open, ms) {
+    var book = document.getElementById('css-book');
+    if (!book) return;
+    // Only open while the book sits closed; a close request always lands, so a
+    // peek can never be left stuck on across an open/close of the guestbook.
+    if (open && !book.closest('.book-wrap.is-closed')) return;
+    var cover = book.querySelector('.book-cover');
+    var back = book.querySelector('.book-back');
+    var t = 'transform ' + ms + 'ms ' + (open ? PEEK_OPEN : PEEK_CLOSE);
+    // The back board shows as soon as the cover starts to turn, and on the way
+    // out holds until the cover has shut over it.
+    var backProps = ['background-color', 'outline-color', 'box-shadow'];
+    var backFade = backProps.map(function (p) {
+      return open ? p + ' 120ms ease' : p + ' 80ms ease ' + Math.max(0, ms - 80) + 'ms';
+    }).join(', ');
+    book.style.transition = t;
+    if (cover) cover.style.transition = t;
+    if (back) back.style.transition = backFade;
+    book.classList.toggle('is-peek', open);
+    clearTimeout(peekTimer);
+    if (!open) {
+      peekTimer = setTimeout(function () {
+        [book, cover, back].forEach(function (el) { if (el) el.style.transition = ''; });
+      }, ms + 50);
+    }
+  }
+  window.addEventListener('message', function (e) {
+    var d = e.data;
+    if (!d || d.source !== SRC) return;
+    if (d.type === 'close') {
+      // One Escape is enough — document+window used to fire announceClosing /
+      // dismissFromOverlay twice and could leave the cover flip wedged open.
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+      return;
+    }
+    if (d.type === 'peek') {
+      peek(!!d.open, Number(d.ms) || 600);
+      return;
+    }
+    if (d.type === 'keyFlip' && (d.dir === 'prev' || d.dir === 'next')) {
+      if (typeof window.__guestbookFlipByKey === 'function') {
+        window.__guestbookFlipByKey(d.dir);
+      }
+      return;
+    }
+    if (d.type === 'dock') {
+      /*
+       * Scroll tracking snaps; only the trip home eases. #stage carries a
+       * 480ms transform transition for that flight, and the tracker re-docks
+       * every frame, so with it left on the book eased toward each new target
+       * and trailed its slot the whole way down the page.
+       */
+      var dockStage = document.getElementById('stage');
+      var animateHome = d.animate !== false;
+
+      // Snap path can reuse a cached fit. The animated trip home cannot: it
+      // needs a fresh measure, and it must drive transform with concrete inline
+      // values (see flyStageHome) — transitioning a transform that only
+      // references CSS variables leaves the animation pending at identity, so
+      // the book hangs full-size then the host refit snaps it into the slot.
+      var fit = window.__dockFit;
+      var key = dockFitKey(d);
+      if (fit && fit.key === key && !animateHome) {
+        if (dockStage) dockStage.style.transition = 'none';
+        var r0 = document.documentElement.style;
+        r0.setProperty('--dock-scale', fit.scale);
+        r0.setProperty('--dock-tx', fit.tx);
+        r0.setProperty('--dock-ty', fit.ty);
+        document.body.classList.add('is-docked');
+        if (dockStage) dockStage.style.transform = '';
+        return;
+      }
+      // Map the stage onto the host's slot rect. Measured at identity each time:
+      // applyBookSize() rewrites --book-w when the book opens (320 -> 440), so a
+      // cached measurement goes stale the moment it has been opened once.
+      var stage = dockStage || document.getElementById('stage');
+      var book = document.getElementById('css-book');
+      if (!stage || !book) return;
+
+      var wasDocked = document.body.classList.contains('is-docked');
+      stage.style.transition = 'none';
+      stage.style.transform = '';
+      document.body.classList.remove('is-docked');
+
+      /*
+       * A dock that arrives mid-close measures a book that is not yet the book
+       * that will land: the closed wrapper is still .is-hidden, so .book keeps
+       * its standalone rotateY(-10deg) and measures narrower than the square
+       * docked one. Scaling off that put the book down too large and left the
+       * refit to snap it. Probe in the closed/docked state instead — all of it
+       * inside one frame, with .book's own easing off, so nothing paints.
+       */
+      var closedProbe = document.getElementById('closed-book');
+      var probeClass = null;
+      if (closedProbe && !closedProbe.classList.contains('is-closed')) {
+        probeClass = closedProbe.className;
+        closedProbe.classList.remove('is-hidden', 'is-opening', 'is-swap');
+        closedProbe.classList.add('is-closed');
+      }
+      var bookPrevT = book.style.transition;
+      var bookPrevTf = book.style.transform;
+      book.style.transition = 'none';
+      /*
+       * The identity measurement has to drop .is-docked, and squaring the book
+       * up is one of the things that class does — so the probe would measure
+       * the standalone rotateY(-10deg) book no matter what state the wrapper
+       * is in. Pin the docked rotation inline for the measurement: the landed
+       * book is square, and that is the width the scale has to solve for.
+       */
+      book.style.transform = 'rotateX(0deg) rotateY(0deg)';
+
+      void stage.offsetWidth;
+      var sr = stage.getBoundingClientRect();
+      var br = book.getBoundingClientRect();
+
+      book.style.transform = bookPrevTf;
+      book.style.transition = bookPrevT;
+      if (probeClass !== null) closedProbe.className = probeClass;
+
+      var scale = br.width > 0 ? d.width / br.width : 1;
+      var sc = { x: sr.left + sr.width / 2, y: sr.top + sr.height / 2 };
+      var bc = { x: br.left + br.width / 2, y: br.top + br.height / 2 };
+      var tx = (d.left + d.width / 2) - (sc.x + (bc.x - sc.x) * scale);
+      var ty = (d.top + d.height / 2) - (sc.y + (bc.y - sc.y) * scale);
+      var txCss = tx.toFixed(2) + 'px';
+      var tyCss = ty.toFixed(2) + 'px';
+      var scaleCss = String(scale);
+
+      var root = document.documentElement.style;
+      root.setProperty('--dock-scale', scaleCss);
+      root.setProperty('--dock-tx', txCss);
+      root.setProperty('--dock-ty', tyCss);
+
+      if (animateHome && !wasDocked) {
+        flyStageHome(stage, txCss, tyCss, scaleCss);
+      } else {
+        document.body.classList.add('is-docked');
+        stage.style.transform = '';
+        stage.style.transition = 'none';
+        // Already home: correct immediately. Arriving keeps the animated path above.
+        if (wasDocked) fitToSlot(d);
+      }
+      return;
+    }
+    if (d.type === 'refit') { fitToSlot(d); return; }
+    if (d.type === 'undock') {
+      /*
+       * Snap, don't animate: standalone the book is already centred at rest, so
+       * gliding it in from the slot would be motion the source never had. The
+       * cover flip that follows is the real animation.
+       */
+      var stage = document.getElementById('stage');
+      if (stage) {
+        clearTimeout(stage.__homeTimer);
+        stage.style.transition = 'none';
+        stage.style.transform = '';
+        document.body.classList.remove('is-docked');
+        void stage.offsetWidth;
+        stage.style.transition = '';
+      } else {
+        document.body.classList.remove('is-docked');
+      }
+      return;
+    }
+    if (d.type === 'open') {
+      var el = document.getElementById('css-book');
+      if (el && !document.body.classList.contains('is-book-open')) el.click();
+    }
+  });
+  function syncEmbedClass() {
+    if (document.documentElement.classList.contains('is-embed')) {
+      document.body.classList.add('is-embed');
+    }
+  }
+  if (document.body) syncEmbedClass();
+  else document.addEventListener('DOMContentLoaded', syncEmbedClass);
+
+  /* Hover hint: the frame is full-viewport at 0,0, so client coords are the
+     host's viewport coords. The host draws the "Click to sign" pill. */
+  var hovering = false;
+  function postHover(type, e) {
+    try { parent.postMessage({ source: SRC, type: type, x: e ? e.clientX : 0, y: e ? e.clientY : 0 }, '*'); } catch (err) {}
+  }
+  function overBook(e) {
+    return document.body.classList.contains('is-docked') &&
+      e.target && e.target.closest && !!e.target.closest('#css-book');
+  }
+  document.addEventListener('mousemove', function (e) {
+    if (overBook(e)) {
+      postHover(hovering ? 'hoverMove' : 'hoverStart', e);
+      hovering = true;
+    } else if (hovering) {
+      hovering = false;
+      postHover('hoverEnd');
+    }
+  }, true);
+  document.addEventListener('mouseleave', function () {
+    if (hovering) { hovering = false; postHover('hoverEnd'); }
+  });
+
+  document.addEventListener('click', function (e) {
+    if (!document.body.classList.contains('is-docked')) return;
+    if (hovering) { hovering = false; postHover('hoverEnd'); }
+    if (!e.target || !e.target.closest) return;
+    if (!e.target.closest('#css-book')) return;
+    // Capture phase, so this lands before the page's own click handler runs
+    // openBook() -> initPageFlip(): #book must be back in the DOM by then.
+    restoreBook();
+    // Host expands the iframe to fullscreen; it will undock us, and the book's
+    // own openBook() runs from its real click handler as usual.
+    post('requestOpen');
+  }, true);
+
+  /*
+   * PageFlip's destroy() takes #book out of the DOM, but the page captured
+   * `bookEl` once at startup — so after a close that reference is detached, and
+   * the next open builds its pages into a node that is no longer on the page
+   * (blank spread, no dotted paper, zero .stf__item). Put it back before the
+   * next open can run.
+   */
+  var bookEl = null;
+  var bookParent = null;
+  function rememberBook() {
+    var el = document.getElementById('book');
+    if (el) { bookEl = el; bookParent = el.parentNode; }
+  }
+  function restoreBook() {
+    if (!bookEl || !bookParent) return;
+    if (!document.getElementById('book')) {
+      bookEl.className = bookEl.className.replace(/\bstf__\S+/g, '').trim();
+      bookEl.removeAttribute('style');
+      bookEl.innerHTML = '';
+      bookParent.appendChild(bookEl);
+    }
+  }
+
+  /*
+   * Announce a dismiss as it is requested, not after it finishes, so the host
+   * can start the book travelling home while the cover is still flipping back —
+   * one gesture rather than three in sequence. Capture phase so this runs
+   * alongside the page's own handlers, never after them.
+   */
+  function announceClosing() {
+    // Only while the book is actually open, and only once per dismiss —
+    // double Escape (host close + key) used to post `closing` twice.
+    if (last !== true) return;
+    if (document.body.classList.contains('is-closing-home')) return;
+    document.body.classList.add('is-closing-home');
+    post('closing');
+  }
+  // Esc keycap must start the same host shrink as frost / Escape.
+  window.__guestbookAnnounceClosing = announceClosing;
+  function bindDismissWatch() {
+    var frost = document.getElementById('frost');
+    if (frost) frost.addEventListener('click', announceClosing, true);
+    window.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') announceClosing();
+    }, true);
+  }
+  if (document.body) bindDismissWatch();
+  else document.addEventListener('DOMContentLoaded', bindDismissWatch);
+
+  /*
+   * Fit the docked book to the slot. .book-wrap carries perspective:1200px, so
+   * the rendered size is not linear in --dock-scale and one correction
+   * under-shoots; iterate until it converges. Transition off throughout, so this
+   * is a measurement pass rather than a second animation.
+   */
+  /*
+   * A cached fit is only good for the book it was measured against. Opening
+   * runs applyBookSize(), which rewrites --book-w (320 -> 440), so the closed
+   * book that comes home is a different size from the one the cache was built
+   * for. Keyed on the slot alone, the shrink used to animate to the stale
+   * scale and then get snapped to the real one by the refit that follows —
+   * the jump in the footer at the end of every close. Keying on the book size
+   * too simply misses the stale entry, so the dock re-measures and the shrink
+   * travels to its true target.
+   */
+  function dockFitKey(d) {
+    var bw = getComputedStyle(document.documentElement)
+      .getPropertyValue('--book-w').trim();
+    return Math.round(d.left) + ':' + Math.round(d.top) + ':' +
+           Math.round(d.width) + ':' + bw;
+  }
+
+  /*
+   * Fly #stage from centre into the footer slot with a real transform
+   * transition. Driving `transform` through CSS variables (the usual docked
+   * rule) creates a pending WAAPI animation that never starts — currentTime
+   * stays 0, the book sits at identity, and the host's later refit snaps it
+   * down. Concrete inline values interpolate reliably; once the flight ends we
+   * clear the inline transform so scroll-tracking can keep updating via vars.
+   */
+  function flyStageHome(stage, txCss, tyCss, scaleCss) {
+    clearTimeout(stage.__homeTimer);
+    stage.style.transition = 'none';
+    stage.style.transform = 'translate(0px, 0px) scale(1)';
+    document.body.classList.add('is-docked');
+    void stage.offsetWidth;
+    // Closing flight home: a touch slower and a gentler ease-out than the
+    // open curve, so the book settles into its slot rather than snapping.
+    stage.style.transition = 'transform 540ms cubic-bezier(0.34, 0.86, 0.4, 1)';
+    stage.style.transform =
+      'translate(' + txCss + ', ' + tyCss + ') scale(' + scaleCss + ')';
+
+    var finish = function (e) {
+      if (e && e.propertyName && e.propertyName !== 'transform') return;
+      stage.removeEventListener('transitionend', finish);
+      clearTimeout(stage.__homeTimer);
+      if (!document.body.classList.contains('is-docked')) return;
+      stage.style.transition = 'none';
+      stage.style.transform = '';
+      void stage.offsetWidth;
+      stage.style.transition = '';
+    };
+    stage.addEventListener('transitionend', finish);
+    stage.__homeTimer = setTimeout(finish, 620);
+  }
+
+  function fitToSlot(d) {
+    var st = document.getElementById('stage');
+    var bk = document.getElementById('css-book');
+    if (!st || !bk || !(d.width > 0)) return;
+    clearTimeout(st.__homeTimer);
+    var pv = st.style.transition;
+    st.style.transition = 'none';
+    st.style.transform = '';
+    var rt = document.documentElement.style;
+    for (var pass = 0; pass < 6; pass++) {
+      var cur = bk.getBoundingClientRect().width;
+      if (!(cur > 0) || Math.abs(cur - d.width) < 0.5) break;
+      var s0 = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--dock-scale')) || 1;
+      rt.setProperty('--dock-scale', String(s0 * (d.width / cur)));
+      void st.offsetWidth;
+    }
+    var r2 = bk.getBoundingClientRect();
+    rt.setProperty('--dock-tx',
+      (parseFloat(rt.getPropertyValue('--dock-tx')) + ((d.left + d.width / 2) - (r2.left + r2.width / 2))).toFixed(2) + 'px');
+    rt.setProperty('--dock-ty',
+      (parseFloat(rt.getPropertyValue('--dock-ty')) + ((d.top + d.height / 2) - (r2.top + r2.height / 2))).toFixed(2) + 'px');
+    void st.offsetWidth;
+    st.style.transition = pv;
+    // Remember the converged values: the next dock for this same slot can go
+    // straight there, so the shrink animates to its true target rather than
+    // overshooting and being snapped back afterwards.
+    window.__dockFit = {
+      key: dockFitKey(d),
+      scale: rt.getPropertyValue('--dock-scale'),
+      tx: rt.getPropertyValue('--dock-tx'),
+      ty: rt.getPropertyValue('--dock-ty')
+    };
+  }
+
+  var last = null;
+  function report() {
+    // "Open" spans the whole sequence, from the first cover-flip frame until the
+    // closed CSS book has been restored (finishClose re-adds .is-closed after
+    // its 210ms beat). Reporting on `is-book-open` alone fires while the cover
+    // is still flipping back, and the host would re-dock mid-animation.
+    var closedWrap = document.getElementById('closed-book');
+    var restored = closedWrap && closedWrap.classList.contains('is-closed');
+    var body = document.body.classList;
+    var open = body.contains('is-book-open') ||
+               body.contains('is-cover-flipping') ||
+               body.contains('is-book-opening') ||
+               !restored;
+    if (open !== last) {
+      last = open;
+      if (open) {
+        rememberBook();
+        document.body.classList.remove('is-closing-home');
+      } else {
+        // Close finished — drop the in-flight flag so the next open starts clean.
+        document.body.classList.remove('is-closing-home');
+      }
+      post(open ? 'opened' : 'closed');
+    }
+  }
+  /*
+   * finishClose() hides PageFlip instantly (#book-wrapper loses .is-visible,
+   * which has transition:none) but only restores the closed CSS book 210ms
+   * later — nothing is painted in between. Standalone that hole sits behind the
+   * frost; docked, the book has just landed in the slot, so it reads as a
+   * blink. Hand over the moment PageFlip goes; the page's own timeout then
+   * re-applies the same classes harmlessly.
+   */
+  function bindHandoff() {
+    var bw = document.getElementById('book-wrapper');
+    if (!bw) return;
+    new MutationObserver(function () {
+      if (!document.body.classList.contains('is-closing-home')) return;
+      if (bw.classList.contains('is-visible')) return;
+      var cw = document.getElementById('closed-book');
+      if (!cw || !cw.classList.contains('is-hidden')) return;
+      var bk = document.getElementById('css-book');
+      var bkPrev = bk ? bk.style.transition : null;
+      if (bk) bk.style.transition = 'none';
+      cw.classList.remove('is-hidden', 'is-opening', 'is-swap');
+      cw.classList.add('is-closed');
+      if (bk) {
+        /*
+         * Square for the whole trip. The docked book is only squared up by
+         * `body.is-docked .book-wrap.is-closed`, which does not settle until
+         * part-way through the travel — so the book arrived tilted, then
+         * snapped square a few frames later at a scale solved for the square
+         * one, a ~13px pop right at the landing. Pinned here, it is the same
+         * shape the scale was measured against from the first frame.
+         */
+        bk.style.transform = 'rotateX(0deg) rotateY(0deg)';
+        void bk.offsetWidth;
+        /*
+         * Hold the easing off until the book is home and the host's refit has
+         * run. Restored on the next frame instead, .book spent 0.7s easing
+         * rotateY(-10deg) -> 0 *while* the shrink was measuring it: the fit
+         * read a narrow, still-turning book, cached that scale, and the book
+         * swelled ~13px and then got snapped back — the flicker in the footer
+         * at the end of every close. Hover gets its easing back afterwards.
+         */
+        clearTimeout(bk.__easeTimer);
+        bk.__easeTimer = setTimeout(function () {
+          bk.style.transform = '';
+          bk.style.transition = bkPrev || '';
+        }, 900);
+      }
+    }).observe(bw, { attributes: true, attributeFilter: ['class'] });
+  }
+  if (document.body) bindHandoff();
+  else document.addEventListener('DOMContentLoaded', bindHandoff);
+
+  var mo = new MutationObserver(report);
+  mo.observe(document.body, { attributes: true, attributeFilter: ['class'] });
+  function watchClosedWrap() {
+    var el = document.getElementById('closed-book');
+    if (el) mo.observe(el, { attributes: true, attributeFilter: ['class'] });
+  }
+  if (document.body) { watchClosedWrap(); rememberBook(); }
+  else document.addEventListener('DOMContentLoaded', function () { watchClosedWrap(); rememberBook(); });
+  post('ready');
+  report();
+})();
+</script>
+</body>
+</html>

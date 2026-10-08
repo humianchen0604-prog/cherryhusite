@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Process Reel — Double Diamond → Continuous Iteration</title>
+<style>
+  :root{
+    --green-l:#C7F95B; --green-d:#A6E13C;
+    --purple-l:#C9A3F7; --purple-d:#B078EF;
+    --ink:#262322; --paper:#FAFAFA;
+    --label:#111;
+
+    --ease-out:    cubic-bezier(.23, 1, .32, 1);   /* entrances */
+    --ease-in-out: cubic-bezier(.77, 0, .175, 1);  /* on-screen movement */
+    --ease-drawer: cubic-bezier(.32, .72, 0, 1);
+    --ease-soft:   cubic-bezier(.33, 0, .67, 1);   /* drift — no visible start or stop */
+  }
+  :root[data-theme='dark']{
+    /* Parent .loom-process-reel paints the soft panel; stage stays clear.
+       --ink stays dark so Problem/Solution pills keep contrast with white type. */
+    --paper:transparent;
+    --label:#fff;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    background:var(--paper);
+    font-family:Inter,-apple-system,BlinkMacSystemFont,"SF Pro Display","Helvetica Neue",Arial,sans-serif;
+    display:flex;align-items:center;justify-content:center;overflow:hidden;
+  }
+  #stage{
+    width:100%;height:100%;
+    background:var(--paper);
+  }
+  svg{width:100%;height:100%;display:block}
+
+  .el{
+    transform-box:view-box;
+    transform:translate(var(--tx,0px),0) scale(var(--sc,1));
+    opacity:0;will-change:transform,opacity;
+  }
+  text{
+    font-family:Inter,-apple-system,BlinkMacSystemFont,"SF Pro Display","Helvetica Neue",Arial,sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  .lbl     {font-size:32px;font-weight:600;fill:var(--label);letter-spacing:-.2px}
+  .pilltext{font-size:32px;font-weight:600;fill:#FFF;letter-spacing:-.2px}
+  .phase   {font-size:42px;font-weight:700;fill:var(--label);letter-spacing:-.6px}
+  .title   {font-size:52px;font-weight:700;fill:var(--label);letter-spacing:-1.1px}
+</style>
+</head>
+<body>
+
+<div id="stage">
+  <svg id="reel" viewBox="0 0 2600 1400" preserveAspectRatio="xMidYMid meet"></svg>
+</div>
+
+<script>
+/* ============================================================
+   GEOMETRY — exact values from Figma (DfbSPhyOyXqGekwuDuRAbM)
+   ============================================================ */
+const CY = 669.5, H0 = 353.5, DDX = 947;
+const GREEN_CX = 826.5;
+const PILL = {w:200, h:91, y:624, r:45.5};
+
+const CHAIN = [
+  {id:'d1', cx:1404.0, h:217.0},
+  {id:'d2', cx:1779.5, h:141.5},
+  {id:'d3', cx:2022.0, h:86.5 },
+  {id:'d4', cx:2169.0, h:46.5 }
+];
+
+/* ============================================================
+   SVG
+   ============================================================ */
+const svg = document.getElementById('reel');
+let defs = '', body = '';
+
+function diamond(id, cx, h, light, dark, inner){
+  const s = h * Math.SQRT2, rx = 14 * (h / H0), rot = `rotate(45 ${cx} ${CY})`;
+  const rect = f => `<rect x="${cx-s/2}" y="${CY-s/2}" width="${s}" height="${s}" rx="${rx}" fill="${f}"/>`;
+  defs += `<clipPath id="cl-${id}"><rect x="${cx-h}" y="${CY-h}" width="${h}" height="${2*h}"/></clipPath>`
+        + `<clipPath id="cr-${id}"><rect x="${cx}"   y="${CY-h}" width="${h}" height="${2*h}"/></clipPath>`;
+  return `<g class="el" id="${id}">
+    <g clip-path="url(#cl-${id})"><g transform="${rot}">${rect(light)}</g></g>
+    <g clip-path="url(#cr-${id})"><g transform="${rot}">${rect(dark)}</g></g>
+    ${inner||''}</g>`;
+}
+const pill = (id,cx,t) => `<g class="el" id="${id}">
+    <rect x="${cx-PILL.w/2}" y="${PILL.y}" width="${PILL.w}" height="${PILL.h}" rx="${PILL.r}" fill="var(--ink)"/>
+    <text class="pilltext" x="${cx}" y="${CY+2}" text-anchor="middle" dominant-baseline="central">${t}</text></g>`;
+const phase = (id,cx,t) => `<g class="el" id="${id}">
+    <text class="phase" x="${cx}" y="1112" text-anchor="middle" dominant-baseline="central">${t}</text></g>`;
+
+body += diamond('green', GREEN_CX, H0, 'var(--green-l)', 'var(--green-d)',
+    `<text class="lbl" x="${GREEN_CX-294}" y="${CY+2}" dominant-baseline="central">Discover</text>`
+  + `<text class="lbl" x="${GREEN_CX+189}" y="${CY+2}" dominant-baseline="central">Define</text>`);
+body += diamond('purple0', GREEN_CX, H0, 'var(--purple-l)', 'var(--purple-d)');
+CHAIN.forEach(d => body += diamond(d.id, d.cx, d.h, 'var(--purple-l)', 'var(--purple-d)'));
+
+/* Design/Deliver — its own element so it can ride the head diamond's push */
+body += `<g class="el" id="dlabels">
+    <text class="lbl" x="${GREEN_CX-294}" y="${CY+2}" dominant-baseline="central">Design</text>
+    <text class="lbl" x="${GREEN_CX+189}" y="${CY+2}" dominant-baseline="central">Deliver</text></g>`;
+
+/* ——— swap either string here ——— */
+const TITLE_1 = 'Double Diamond Process';
+const TITLE_2 = 'New Iteration Loop';
+const TITLE_Y = 172;                       // sits in the empty band above the diamonds (they start at y 316)
+
+const title = (id,t) => `<g class="el" id="${id}">
+    <text class="title" x="1300" y="${TITLE_Y}" text-anchor="middle" dominant-baseline="central">${t}</text></g>`;
+
+body += pill('pillProblem', 353, 'Problem') + pill('pillDefinition', 1300, 'Definition') + pill('pillSolution', 353, 'Solution');
+body += phase('labelStrategic', GREEN_CX, 'Strategic Phase');
+body += phase('labelCreative',  GREEN_CX, 'Creative Phase');
+body += title('titleAct1', TITLE_1) + title('titleAct2', TITLE_2);
+
+svg.innerHTML = `<defs>${defs}</defs>${body}`;
+
+const POP_SCALE = 0.58;
+/* exitRank groups act 1 by screen position, right to left: the purple cluster
+   goes first, Problem last. Array order can't do this — dlabels and the phase
+   labels sit late in LR for z-order reasons but live in the middle of the frame. */
+const CFG = {
+  pillProblem   :{max:1, inDur:520, exitRank:3},
+  green         :{max:1, inDur:560, exitRank:2},
+  pillDefinition:{max:1, inDur:520, exitRank:1},
+  purple0       :{max:1, inDur:480, exitRank:0, pop:true, ox:GREEN_CX - H0},
+  d1            :{max:1, inDur:480, pop:true, ox:CHAIN[0].cx - CHAIN[0].h},
+  d2            :{max:1, inDur:470, pop:true, ox:CHAIN[1].cx - CHAIN[1].h},
+  d3            :{max:1, inDur:460, pop:true, ox:CHAIN[2].cx - CHAIN[2].h},
+  d4            :{max:1, inDur:460, pop:true, ox:CHAIN[3].cx - CHAIN[3].h},
+  dlabels       :{max:1, inDur:400, exitRank:0, ox:GREEN_CX},
+  pillSolution  :{max:1, inDur:520, moveDur:600},
+  labelStrategic:{max:1, inDur:520, exitRank:2},
+  labelCreative :{max:1, inDur:520, exitRank:0},
+  // present from the first frame like the rest of act 1 — only its exit animates
+  titleAct1     :{max:1, inDur:760, exitRank:0},
+  titleAct2     :{max:1, inDur:760}
+};
+const LR = ['pillProblem','green','pillDefinition','purple0','d1','d2','d3','d4',
+            'dlabels','pillSolution','labelStrategic','labelCreative','titleAct1','titleAct2'];
+const els = {};
+LR.forEach(id => {
+  const el = document.getElementById(id);
+  if (CFG[id].ox != null) el.style.transformOrigin = `${CFG[id].ox}px ${CY}px`;
+  els[id] = el;
+});
+
+/* ============================================================
+   THE PUSH — chain is right-anchored; each new diamond shoves the rest left.
+   gx 947 seats the pill on 1300 and the head diamond in its original
+   double-diamond position; offsets apportioned by added width so the final
+   push lands the pill on 353 exactly.
+   ============================================================ */
+const STAGES = [
+  {add:'purple0', gx:947  },
+  {add:'d1',      gx:543.7},
+  {add:'d2',      gx:269.3},
+  {add:'d3',      gx:97.8 },
+  {add:'d4',      gx:0    }
+];
+const GROUP = ['pillSolution','purple0','dlabels','d1','d2','d3','d4'];
+/* PUSH_DUR and POP_DUR are equal on purpose. A newcomer is seated beside its
+   neighbour's CURRENT position and then travels to the new offset with it, so
+   the two must share duration and curve or they drift apart mid-shove and
+   collide. STAGE_GAP exceeds both, so no shove is ever retargeted in flight. */
+const PUSH_DUR = 340, POP_DUR = 340, STAGE_GAP = 360;
+
+/* ============================================================
+   BEATS
+   ============================================================ */
+const DD = {pillProblem:{}, green:{}, pillDefinition:{}, purple0:{tx:DDX}, dlabels:{tx:DDX},
+            labelStrategic:{}, labelCreative:{tx:DDX}, pillSolution:{tx:DDX*2}, titleAct1:{}};
+/* the pill leaves as soon as rank 0 — the purple cluster it has to cross — is
+   effectively gone, not when the whole dissolve has finished */
+const F_PILL = {pillSolution:{tx:DDX, d:280}};
+
+const TOTAL = 3;
+const END_HOLD = 2400, LOOP_FADE = 420;
+
+/* ============================================================
+   MOTION
+   ============================================================ */
+const MOVE_DUR = 880;
+/* Fade and drift are decoupled: opacity is gone at 380ms while the drift runs
+   on to 780ms, so a leaving element is never seen arriving anywhere. The shift
+   is small — it should read as a drift, not a dart. */
+const EXIT_FADE = 380, EXIT_DRIFT = 780, EXIT_STEP = 90, EXIT_SHIFT = -90;
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+let playing = true, speed = 1, gen = 0, prev = {};
+const restScale = id => CFG[id].pop ? POP_SCALE : 1;
+
+function meter(){}
+
+function hardApply(st, i){
+  LR.forEach(id => {
+    const el = els[id], now = st[id];
+    el.style.transition = 'none';
+    el.style.setProperty('--tx', ((now && now.tx) || 0) + 'px');
+    el.style.setProperty('--sc', now ? 1 : restScale(id));
+    el.style.opacity = now ? CFG[id].max : 0;
+  });
+  svg.getBoundingClientRect();
+  prev = Object.assign({}, st);
+  meter(i);
+}
+
+/* one-off fade for an element that isn't part of a frame state */
+function fadeIn(id, delay){
+  const el = els[id];
+  el.style.transition = 'none';
+  el.style.setProperty('--tx', '0px');
+  el.style.setProperty('--sc', 1);
+  el.style.opacity = 0;
+  svg.getBoundingClientRect();
+  el.style.transition = `opacity ${CFG[id].inDur/speed}ms var(--ease-out) ${delay/speed}ms`;
+  el.style.opacity = CFG[id].max;
+}
+
+function applyFrame(st, i){
+  LR.forEach((id,k) => {
+    const el = els[id], now = st[id], was = prev[id];
+    const on = !!now, wasOn = !!was;
+    const leaving = !on && wasOn;
+    const d = ((now && now.d) || 0) / speed;
+
+    // leaving elements drift left while they fade; nothing snaps out
+    const tx = on ? (now.tx || 0)
+                  : (was ? (was.tx || 0) : 0) + (leaving && !reduce ? EXIT_SHIFT : 0);
+
+    let t;
+    if (on && !wasOn){
+      const dur = CFG[id].inDur / speed;
+      t = CFG[id].pop && !reduce
+        ? `transform ${dur}ms var(--ease-out) ${d}ms, opacity ${dur*0.62}ms var(--ease-out) ${d}ms`
+        : `opacity ${dur}ms var(--ease-out) ${d}ms, transform 0ms linear ${d}ms`;
+    } else if (leaving){
+      const dly = ((CFG[id].exitRank || 0) * EXIT_STEP) / speed;
+      t = `opacity ${EXIT_FADE/speed}ms var(--ease-out) ${dly}ms,`
+        + ` transform ${EXIT_DRIFT/speed}ms var(--ease-soft) ${dly}ms`;
+    } else {
+      const mv = (CFG[id].moveDur || MOVE_DUR) / speed;
+      t = reduce ? `opacity 200ms linear, transform 0ms linear`
+                 : `transform ${mv}ms var(--ease-drawer) ${d}ms, opacity 200ms var(--ease-out)`;
+    }
+    el.style.transition = t;
+    el.style.opacity = on ? CFG[id].max : 0;
+    el.style.setProperty('--tx', tx + 'px');
+    // leaving elements hold their size — only opacity and x change
+    el.style.setProperty('--sc', (on || leaving) ? 1 : restScale(id));
+  });
+  prev = Object.assign({}, st);
+  meter(i);
+}
+
+async function growChain(my){
+  meter(2);
+  fadeIn('titleAct2', 260);                      // act 2's title arrives with the first pop
+  const live = [{id:'pillSolution', off:0}];
+
+  for (let si = 0; si < STAGES.length; si++){
+    if (my !== gen) return;
+    const st = STAGES[si];
+    const nu = els[st.add];
+    const head = st.add === 'purple0';
+    /* Seat the newcomer where the chain IS right now, not where it is going.
+       Its neighbour has not been shoved yet, so seating at st.gx drops the
+       newcomer on top of that neighbour for the whole length of the push. */
+    const seat = si === 0 ? st.gx : STAGES[si-1].gx;
+
+    nu.style.transition = 'none';
+    nu.style.setProperty('--tx', seat + 'px');
+    nu.style.setProperty('--sc', POP_SCALE);
+    nu.style.opacity = 0;
+    if (head){
+      els.dlabels.style.transition = 'none';
+      els.dlabels.style.setProperty('--tx', seat + 'px');
+      els.dlabels.style.setProperty('--sc', 1);
+      els.dlabels.style.opacity = 0;
+    }
+    svg.getBoundingClientRect();                 // flush before anything animates
+
+    live.forEach(({id, off}) => {
+      els[id].style.transition = `transform ${PUSH_DUR/speed}ms var(--ease-in-out),`
+                               + ` opacity ${CFG[id].inDur/speed}ms var(--ease-out)`;
+      els[id].style.setProperty('--tx', (st.gx + off) + 'px');
+    });
+    /* transform carries both the grow and the shove, so it must use the same
+       curve and duration as everyone else or the chain flexes. Opacity is a
+       separate property, so the fade gets the full window to itself. */
+    nu.style.transition = `transform ${POP_DUR/speed}ms var(--ease-in-out),`
+                        + ` opacity ${POP_DUR/speed}ms var(--ease-out)`;
+    nu.style.setProperty('--tx', st.gx + 'px');
+    nu.style.setProperty('--sc', 1);
+    nu.style.opacity = 1;
+    if (head){
+      els.dlabels.style.transition = `opacity ${CFG.dlabels.inDur/speed}ms var(--ease-out) ${POP_DUR*0.4/speed}ms`;
+      els.dlabels.style.opacity = 1;
+      live.push({id:'dlabels', off:0});
+    }
+
+    live.push({id:st.add, off:0});
+    await sleep(STAGE_GAP);
+  }
+  prev = {};
+  GROUP.forEach(id => prev[id] = {});
+  prev.titleAct2 = {};
+  await sleep(Math.max(PUSH_DUR, POP_DUR) - STAGE_GAP + 220);
+}
+
+function sleep(ms){
+  return new Promise(res => {
+    let left = ms / speed, last = performance.now();
+    const iv = setInterval(() => {
+      const now = performance.now();
+      if (playing) left -= (now - last);
+      last = now;
+      if (left <= 0){ clearInterval(iv); res(); }
+    }, 25);
+  });
+}
+
+async function run(){
+  const my = ++gen;
+  for(;;){
+    if (my !== gen) return;
+    /* 1 — the old model, hard-set, no motion at all */
+    hardApply(DD, 0);       await sleep(2400);   if (my !== gen) return;
+    /* 2 — the model drifts left and fades; the Solution stays solid and
+           travels to centre as the last of it clears */
+    applyFrame(F_PILL, 1);  await sleep(1150);   if (my !== gen) return;
+    /* 3 — diamonds pop in and push the pill to the left edge */
+    await growChain(my);                         if (my !== gen) return;
+    await sleep(END_HOLD);
+
+    LR.forEach(id => { els[id].style.transition = `opacity ${LOOP_FADE/speed}ms var(--ease-out)`;
+                       els[id].style.opacity = 0; });
+    await sleep(LOOP_FADE + 260);
+  }
+}
+
+run();
+
+/* Mirror the parent case-study theme so labels go white on the soft panel. */
+(function syncTheme(){
+  const apply = () => {
+    try {
+      const theme = window.parent.document.documentElement.getAttribute('data-theme') || 'light';
+      document.documentElement.setAttribute('data-theme', theme);
+    } catch (_) { /* ignore cross-origin */ }
+  };
+  apply();
+  try {
+    new MutationObserver(apply).observe(window.parent.document.documentElement, {
+      attributes: true,
+      attributeFilter: ['data-theme'],
+    });
+  } catch (_) { /* ignore */ }
+})();
+</script>
+</body>
+</html>

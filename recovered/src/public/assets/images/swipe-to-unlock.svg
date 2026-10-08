@@ -1,0 +1,67 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 1971" width="1240" height="1971" font-family="'Arial Narrow','Helvetica Neue',Helvetica,Arial,sans-serif">
+  <rect width="1240" height="1971" fill="#ffffff"/>
+
+  <!-- bestseller banner -->
+  <rect x="0" y="52" width="1240" height="80" fill="#0d0d0d"/>
+  <text x="620" y="107" text-anchor="middle" fill="#ffffff" font-size="40" font-weight="700"
+        letter-spacing="1.5" textLength="1080" lengthAdjust="spacingAndGlyphs">#1 PRODUCT MANAGEMENT BESTSELLER IN AMERICA</text>
+
+  <!-- blurb -->
+  <g fill="#1a1a1a" font-size="46" font-style="italic">
+    <text x="86" y="234" textLength="1020" lengthAdjust="spacingAndGlyphs">“Swipe to Unlock is the go-to guide for learning the important trends,</text>
+    <text x="86" y="292" textLength="880" lengthAdjust="spacingAndGlyphs">concepts, and strategies driving the tech industry!”</text>
+  </g>
+  <text x="240" y="360" fill="#0d0d0d" font-size="44" font-weight="700" letter-spacing="1"
+        textLength="880" lengthAdjust="spacingAndGlyphs">— MORGAN BROWN, AUTHOR OF HACKING GROWTH</text>
+
+  <!-- SWIPE -->
+  <g fill="#2b2b2b" font-weight="700" font-size="600">
+    <text x="150" y="880" textLength="455" lengthAdjust="spacingAndGlyphs">SW</text>
+    <text x="722" y="880" textLength="368" lengthAdjust="spacingAndGlyphs">PE</text>
+  </g>
+  <!-- the blue "i" -->
+  <rect x="622" y="600" width="80" height="270" rx="40" fill="#3ab5e0"/>
+  <circle cx="662" cy="562" r="62" fill="#ffffff"/>
+  <circle cx="662" cy="562" r="62" fill="none" stroke="#e8e8e8" stroke-width="2"/>
+
+  <!-- TO UNLOCK -->
+  <text x="620" y="1160" text-anchor="middle" fill="#2b2b2b" font-weight="700" font-size="330"
+        textLength="900" lengthAdjust="spacingAndGlyphs">TO UNLOCK</text>
+
+  <!-- subtitle -->
+  <g fill="#3d3d3d" font-size="72">
+    <text x="118" y="1425" textLength="660" lengthAdjust="spacingAndGlyphs">The Primer on Technology</text>
+    <text x="118" y="1512" textLength="600" lengthAdjust="spacingAndGlyphs">and Business Strategy</text>
+  </g>
+
+  <!-- award seal -->
+  <g transform="translate(965,1455)">
+    <circle r="130" fill="#e8b45a"/>
+    <circle r="112" fill="none" stroke="#f2d29a" stroke-width="3"/>
+    <text y="-72" text-anchor="middle" fill="#5b4318" font-size="22" font-weight="700"
+          textLength="150" lengthAdjust="spacingAndGlyphs">NORTH AMERICAN</text>
+    <text y="-46" text-anchor="middle" fill="#5b4318" font-size="22" font-weight="700"
+          textLength="120" lengthAdjust="spacingAndGlyphs">BOOK AWARDS</text>
+    <g transform="translate(-46,-24)" fill="#ffffff" stroke="#5b4318" stroke-width="3">
+      <rect x="0" y="8" width="34" height="52" rx="3"/>
+      <rect x="28" y="0" width="34" height="60" rx="3"/>
+      <rect x="56" y="10" width="34" height="50" rx="3"/>
+    </g>
+    <text y="70" text-anchor="middle" fill="#5b4318" font-size="26" font-weight="700"
+          textLength="130" lengthAdjust="spacingAndGlyphs">2018 Business</text>
+    <text y="100" text-anchor="middle" fill="#5b4318" font-size="26" font-weight="700"
+          textLength="80" lengthAdjust="spacingAndGlyphs">Winner</text>
+  </g>
+
+  <!-- authors -->
+  <g text-anchor="middle" font-weight="400">
+    <text x="245" y="1795" fill="#4a4a4a" font-size="60" letter-spacing="4" textLength="200" lengthAdjust="spacingAndGlyphs">NEEL</text>
+    <text x="245" y="1880" fill="#3ab5e0" font-size="76" font-weight="700" letter-spacing="2" textLength="290" lengthAdjust="spacingAndGlyphs">MEHTA</text>
+
+    <text x="620" y="1795" fill="#4a4a4a" font-size="60" letter-spacing="4" textLength="215" lengthAdjust="spacingAndGlyphs">PARTH</text>
+    <text x="620" y="1880" fill="#3ab5e0" font-size="76" font-weight="700" letter-spacing="2" textLength="330" lengthAdjust="spacingAndGlyphs">DETROJA</text>
+
+    <text x="995" y="1795" fill="#4a4a4a" font-size="60" letter-spacing="4" textLength="230" lengthAdjust="spacingAndGlyphs">ADITYA</text>
+    <text x="995" y="1880" fill="#3ab5e0" font-size="76" font-weight="700" letter-spacing="2" textLength="300" lengthAdjust="spacingAndGlyphs">AGASHE</text>
+  </g>
+</svg>

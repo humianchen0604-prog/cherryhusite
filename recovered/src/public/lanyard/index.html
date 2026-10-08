@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/lanyard/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>profilelanyard</title>
+    <!-- Paint a transparent (night: dark-scheme) frame before React boots so
+         the host page never sees the browser's default white iframe plate. -->
+    <script>
+      (function () {
+        var dark = /[?&]theme=dark(?:&|$)/.test(location.search);
+        var root = document.documentElement;
+        root.style.colorScheme = dark ? 'dark' : 'normal';
+        root.style.background = 'transparent';
+        document.addEventListener('DOMContentLoaded', function () {
+          document.body.style.background = 'transparent';
+        });
+      })();
+    </script>
+    <style>
+      html, body, #root { background: transparent !important; }
+    </style>
+    <script type="module" crossorigin src="/lanyard/assets/index-DcOVfW4x.js"></script>
+    <link rel="stylesheet" crossorigin href="/lanyard/assets/index-B7_Ct8vI.css">
+  </head>
+  <body>
+    <div id="root"></div>
+  </body>
+</html>

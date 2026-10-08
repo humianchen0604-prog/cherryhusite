@@ -1,0 +1,223 @@
+/*
+ * Wall-mounted record player with a pull cord — see WallRecordPlayer.tsx.
+ *
+ * Sized in `cqw` against the root's own width (100cqw = the player's width).
+ * The root is 1 : 2: the square body on top, the cord hanging below it. The
+ * cord's SVG viewBox (0 0 100 200) matches that ratio.
+ */
+
+.wrp {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 100 / 200;
+  container-type: inline-size;
+  /* Only the body and the bead are live — the empty space beside the cord
+     must not catch hovers or drags meant for the board behind it. */
+  pointer-events: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* --- cord (behind the body, so it reads as coming out from under it) ------ */
+
+.wrp-cord {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+/* Strokes are in screen px (non-scaling) with a floor, so the cord stays a
+   visible line when the player is sticker-sized rather than going sub-pixel. */
+.wrp-cord-line,
+.wrp-cord-edge,
+.wrp-cord-shadow {
+  fill: none;
+  stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
+}
+.wrp-cord-line { stroke: #fdfdfc; stroke-width: max(1.6px, 0.9cqw); }
+.wrp-cord-edge { stroke: rgb(0 0 0 / 0.2); stroke-width: max(3px, 1.25cqw); }
+.wrp-cord-shadow { stroke: rgb(0 0 0 / 0.07); stroke-width: max(2px, 1.1cqw); filter: blur(0.5px); }
+.wrp-bead-shadow { fill: rgb(0 0 0 / 0.08); filter: blur(0.8px); }
+.wrp-bead {
+  fill: url(#wrp-bead-fill);
+  stroke: rgb(0 0 0 / 0.2);
+  stroke-width: 0.8px;
+  vector-effect: non-scaling-stroke;
+}
+.wrp-bead-hit {
+  fill: transparent;
+  pointer-events: auto;
+  cursor: grab;
+  touch-action: none;
+}
+.wrp[data-pulling] .wrp-bead-hit { cursor: grabbing; }
+
+/* --- body --------------------------------------------------------------- */
+
+.wrp-body {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100cqw;
+  height: 100cqw;
+  border-radius: 13cqw;
+  pointer-events: auto;
+  cursor: pointer;
+  outline: none;
+  background: linear-gradient(165deg, #ffffff 0%, #f7f7f5 55%, #f1f1ee 100%);
+  box-shadow:
+    0 0 0 0.35cqw rgb(0 0 0 / 0.045),        /* hairline edge on a near-white board */
+    inset 0 0.5cqw 0 rgb(255 255 255 / 0.9),  /* top edge catching light */
+    inset 0 -1.1cqw 0 rgb(0 0 0 / 0.04),      /* the lip of the bottom face */
+    0 0.6cqw 1.2cqw rgb(0 0 0 / 0.05),
+    0 3.2cqw 6cqw -1cqw rgb(0 0 0 / 0.12);    /* cast onto the wall */
+}
+.wrp-body:focus-visible {
+  box-shadow:
+    0 0 0 0.35cqw rgb(0 0 0 / 0.045),
+    0 0 0 2.4cqw var(--selection-bg, #E6F5FF),
+    inset 0 -1.1cqw 0 rgb(0 0 0 / 0.04),
+    0 3.2cqw 6cqw -1cqw rgb(0 0 0 / 0.12);
+}
+
+.wrp-grille {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  fill: #8d8d89;
+}
+
+/* The shallow round recess the record sits in. */
+.wrp-well {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 76cqw;
+  height: 76cqw;
+  translate: -50% -50%;
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 40%, #fbfbfa 0%, #f3f3f1 70%, #ededea 100%);
+  box-shadow:
+    inset 0 0.7cqw 1.2cqw rgb(0 0 0 / 0.07),
+    inset 0 -0.3cqw 0.5cqw rgb(255 255 255 / 0.9),
+    0 0.3cqw 0 rgb(255 255 255 / 0.8);
+}
+
+.wrp-disc-wrap {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 66cqw;
+  height: 66cqw;
+  translate: -50% -50%;
+  border-radius: 50%;
+  box-shadow: 0 0.9cqw 1.8cqw rgb(0 0 0 / 0.22), 0 0.2cqw 0.4cqw rgb(0 0 0 / 0.18);
+}
+.wrp-disc {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  will-change: transform;
+}
+.wrp-disc img {
+  position: absolute;
+  display: block;
+  -webkit-user-drag: none;
+  user-select: none;
+  pointer-events: none;
+}
+.wrp-vinyl {
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+/* Misty grey-blue record instead of black: `screen` lifts the black vinyl to
+   this colour while the grooves and baked-in shine stay lighter on top of it.
+   It only blends with the vinyl — .wrp-disc (will-change) is its own
+   stacking context, and the label sits above it. */
+.wrp-tint {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: #97a7b6;
+  mix-blend-mode: screen;
+  pointer-events: none;
+}
+.wrp-label {
+  left: 50%;
+  top: 50%;
+  width: 44%;
+  height: 44%;
+  translate: -50% -50%;
+  border-radius: 50%;
+  object-fit: cover;
+  box-shadow: 0 0 0 0.25cqw rgb(0 0 0 / 0.35);
+  /* The Continuum cover is a flat mid-grey — lift it so it reads lighter
+     than the grey-blue vinyl around it. */
+  filter: brightness(1.18) contrast(1.04);
+}
+/* Fixed sheen over the grooves. It does NOT turn with the record — the light
+   stays put while the vinyl moves under it, which is what sells the spin. */
+.wrp-sheen {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  pointer-events: none;
+  background: conic-gradient(from 20deg,
+    transparent 0deg, rgb(255 255 255 / 0.16) 28deg, transparent 62deg,
+    transparent 180deg, rgb(255 255 255 / 0.1) 210deg, transparent 245deg);
+  -webkit-mask: radial-gradient(circle, transparent 22.5%, #000 23.5%, #000 70%, transparent 100%);
+  mask: radial-gradient(circle, transparent 22.5%, #000 23.5%, #000 70%, transparent 100%);
+  mix-blend-mode: screen;
+}
+
+/* Spindle cap. */
+.wrp-hub {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 15cqw;
+  height: 15cqw;
+  translate: -50% -50%;
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 38%, #6b6b6a 0%, #4e4e4d 55%, #3d3d3c 100%);
+  box-shadow:
+    0 0.5cqw 1cqw rgb(0 0 0 / 0.3),
+    inset 0 0.3cqw 0.3cqw rgb(255 255 255 / 0.18),
+    inset 0 -0.4cqw 0.5cqw rgb(0 0 0 / 0.3);
+}
+.wrp-hub::before {
+  content: '';
+  position: absolute;
+  inset: 28%;
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 35%, #5c5c5b, #333332);
+  box-shadow: inset 0 0.25cqw 0.35cqw rgb(0 0 0 / 0.45), 0 0.15cqw 0 rgb(255 255 255 / 0.12);
+}
+.wrp-hub::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 1.6cqw;
+  height: 1.6cqw;
+  translate: -50% -50%;
+  border-radius: 50%;
+  background: #1f1f1e;
+}
+
+/* Night: the plastic is still white, just not glowing against the dark board. */
+:root[data-theme='dark'] .wrp-body {
+  background: linear-gradient(165deg, #ececea 0%, #e2e2df 55%, #d9d9d5 100%);
+  box-shadow:
+    0 0 0 0.35cqw rgb(255 255 255 / 0.06),
+    inset 0 0.5cqw 0 rgb(255 255 255 / 0.6),
+    inset 0 -1.1cqw 0 rgb(0 0 0 / 0.06),
+    0 3.2cqw 6cqw -1cqw rgb(0 0 0 / 0.5);
+}
+:root[data-theme='dark'] .wrp-well {
+  background: radial-gradient(circle at 50% 40%, #e6e6e3 0%, #dcdcd8 70%, #d4d4d0 100%);
+}
+:root[data-theme='dark'] .wrp-cord-line { stroke: #dededb; }

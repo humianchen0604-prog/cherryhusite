@@ -1,0 +1,1129 @@
+/* Grumble — additions on top of casestudy.css.
+ *
+ * The page reuses the Lemon8 case-study shell for every shared decision:
+ * page padding and the 140px section rhythm (.framer-172orq5), section gaps,
+ * the h5 eyebrow / h1 title / body-copy presets, media bands and the takeaway
+ * row. Only the patterns Grumble has and Lemon8 doesn't live here, and they
+ * borrow the case study's own tokens (24px gutter, #fafafa frames, the
+ * 1199.98px collapse breakpoint) so nothing drifts.
+ */
+
+/* Rich-text wrappers. Framer's base stylesheet absolutely positions an
+   unclassed [data-framer-component-type] node, so the eyebrow and title
+   wrappers need the same relative, full-width footing the case study's own
+   generated classes give them. */
+.framer-pR67w .grumble-rt {
+  position: relative;
+  flex: 0 0 auto;
+  width: 100%;
+  height: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-wrap: break-word;
+}
+
+/* Section eyebrows match the hero kicker ("Hackathon ·") — 60% black, not solid. */
+.framer-pR67w .grumble-rt > h5.framer-styles-preset-1w502i7 {
+  --framer-text-color: rgba(0, 0, 0, 0.6);
+}
+
+.grumble-emphasis {
+  font-weight: 500;
+}
+
+/* Same hand-drawn highlighter as Lemon8, recolored to Grumble's peach. */
+.grumble-highlight {
+  position: relative;
+  z-index: 0;
+  display: inline-block;
+  white-space: nowrap;
+  color: inherit;
+}
+.grumble-highlight::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0.02em;
+  height: calc(0.2em + 2px);
+  background-color: #FFCD98;
+  -webkit-mask-image: url('/assets/images/lemon8-highlight-stroke.svg');
+  mask-image: url('/assets/images/lemon8-highlight-stroke.svg');
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-size: 100% 100%;
+  mask-size: 100% 100%;
+  z-index: -1;
+}
+
+.grumble-figbuild {
+  white-space: nowrap;
+}
+
+.grumble-figbuild img {
+  display: inline-block;
+  height: 0.78em;
+  width: 0.78em;
+  margin-right: 0.28em;
+  vertical-align: -0.08em;
+  object-fit: cover;
+  border-radius: 0.18em;
+}
+
+/* Two media columns — the overview problem/solution cards and the daily /
+   weekly clock views. Same gutter and collapse point as .hierarchy-compare. */
+.grumble-pair {
+  display: flex;
+  flex-flow: column;
+  align-items: stretch;
+  gap: 24px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.grumble-pair__col {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 24px;
+  width: 100%;
+  min-width: 0;
+}
+
+.grumble-pair__col > .grumble-figure {
+  flex: 1 1 0;
+  width: 1px;
+  min-width: 0;
+}
+
+/* Captions sit to the right of the figure, same measure as the old stacked
+   caption so Daily / Weekly copy still wraps at a readable width. */
+.grumble-pair__copy {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1 1 0;
+  width: 1px;
+  min-width: 0;
+}
+
+@media (max-width: 1199.98px) {
+  .grumble-pair__col {
+    flex-direction: column;
+  }
+
+  .grumble-pair__col > .grumble-figure,
+  .grumble-pair__copy {
+    flex: 0 0 auto;
+    width: 100%;
+  }
+}
+
+/* Plain full-width figure. Images carry their own background from Figma, so
+   the frame stays out of the way. */
+.grumble-figure {
+  display: block;
+  width: 100%;
+  margin: 0;
+}
+
+.grumble-figure img,
+.grumble-figure video {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+/* Prototype / Dev Post pills. Sized off the 12px eyebrow so they read as
+   metadata next to the overview copy rather than as page-level buttons. */
+.grumble-links {
+  display: flex;
+  flex-flow: row wrap;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.grumble-pill,
+a.grumble-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  box-sizing: border-box;
+  border: 0.5pt solid rgb(0 0 0 / 0.15);
+  border-radius: 100px;
+  background: #fff;
+  color: rgba(0, 0, 0, 0.45);
+  font-family: 'Switzer', 'Switzer Placeholder', sans-serif;
+  font-size: 13px;
+  line-height: 120%;
+  text-decoration: none;
+  transition:
+    background-color 160ms ease,
+    color 160ms ease,
+    border-color 160ms ease;
+}
+
+.grumble-pill__brand {
+  display: block;
+  flex: none;
+  width: 1em;
+  height: 1em;
+}
+
+.grumble-pill__arrow {
+  display: flex;
+  flex: none;
+  width: 12px;
+  height: 12px;
+  opacity: 0.7;
+  pointer-events: none;
+  transition: opacity 160ms ease;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .grumble-pill:hover,
+  a.grumble-pill:hover {
+    background: var(--selection-bg);
+    border-color: var(--selection-bg);
+    color: #000;
+  }
+
+  .grumble-pill:hover .grumble-pill__arrow {
+    opacity: 1;
+  }
+}
+
+a.grumble-pill:active {
+  transform: scale(0.97);
+}
+
+/* 16:9 embed for the demo video. */
+.grumble-embed {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  background: #f2f2f2;
+  overflow: hidden;
+}
+
+.grumble-embed iframe {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+
+/* Figma Slides deck — same 16:9 stage as the walkthrough, with a hairline so
+   it reads as a presentation card rather than a raw iframe. */
+.grumble-embed--deck {
+  border: 0.5pt solid rgb(0 0 0 / 0.15);
+  background: #fff;
+}
+
+.framer-pR67w #solution {
+  scroll-margin-top: 60px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .grumble-pill {
+    transition: none;
+  }
+}
+
+/* Research runs several eyebrow-led topics through one wrapper, so each new
+   one needs more air than the 16px that separates a label from its content.
+   64px is the same in-section step .hierarchy-compare uses on the case study. */
+.framer-pR67w .framer-1warq6h > .framer-eahql:not(:first-child) {
+  margin-top: 64px;
+}
+
+/* A figure or paragraph belongs to the topic above it, so it keeps the tight
+   16px; only the copy that closes a topic gets a little room after it. */
+.framer-pR67w .framer-1warq6h > .grumble-pair {
+  margin-top: 8px;
+}
+
+/* "Short Recap" — a skim-friendly summary ahead of Overview. Mirrors the
+   site's own #fafafa / sharp-corner card token (.insight-card, the takeaway
+   pair in .framer-z42bak) rather than introducing a new surface. */
+.grumble-tldr {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+}
+
+/* Same 140px section rhythm as Overview → Problem (.framer-172orq5).
+   Parent .framer-3eslqg already contributes 6px. */
+.framer-pR67w .framer-3eslqg > .grumble-tldr {
+  margin-top: 134px;
+}
+
+@media (max-width: 1199.98px) {
+  .framer-pR67w .framer-3eslqg > .grumble-tldr {
+    margin-top: 74px;
+  }
+}
+
+.grumble-tldr__grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  width: 100%;
+  margin-top: 8px;
+  box-sizing: border-box;
+}
+
+.grumble-tldr-card {
+  background: #fafafa;
+  padding: 32px 24px 28px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.grumble-tldr-card__num {
+  font-family: 'Switzer', 'Switzer Placeholder', sans-serif;
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 120%;
+  color: rgba(0, 0, 0, 0.35);
+}
+
+.grumble-tldr-card__title {
+  margin: 0;
+  font-family: 'Switzer', 'Switzer Placeholder', sans-serif;
+  font-size: 16px;
+  font-weight: 400;
+  line-height: 130%;
+  color: #000;
+}
+
+.grumble-tldr-card__body {
+  margin: 0;
+  font-family: 'Switzer', 'Switzer Placeholder', sans-serif;
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 154%;
+  color: rgba(0, 0, 0, 0.6);
+}
+
+@media (max-width: 1199.98px) {
+  .grumble-tldr__grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Overview stack: heading, body, then a Context line before the pills. */
+.grumble-intro-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.grumble-intro-col {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+  min-width: 0;
+}
+
+.grumble-intro-col > .grumble-links {
+  margin-top: 12px;
+}
+
+.framer-pR67w p.framer-styles-preset-ybrah6.grumble-intro-lead {
+  --framer-text-color: #000;
+  --framer-text-color-rgb: #000;
+  color: #000;
+}
+
+.framer-pR67w p.grumble-context {
+  --framer-text-color: #000;
+  position: relative;
+  padding-inline-start: 14px;
+}
+
+.grumble-context::before {
+  content: '';
+  position: absolute;
+  inset-inline-start: 0;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: rgba(55, 53, 47, 0.16);
+}
+
+/* "Origin of Concept" — a personal-story problem framing (mirrors Dandi's own
+   origin-story section): stacked paragraphs with an emphasized line inline,
+   rather than the single big Title heading other Problem/Solution rows use. */
+.grumble-origin {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* Three symptom marks under "we experienced:" — icon then label, no cards. */
+.grumble-symptoms {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px 24px;
+  width: 100%;
+  margin: 8px 0 4px;
+  padding: 0;
+  list-style: none;
+}
+
+.grumble-symptom {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 16px;
+  box-sizing: border-box;
+  border: 0.5pt solid rgb(0 0 0 / 0.1);
+}
+
+.grumble-symptom__icon {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  width: 40px;
+  height: 40px;
+  overflow: visible;
+  color: rgb(0 0 0 / 0.6);
+}
+
+.grumble-symptom__icon > div,
+.grumble-symptom__icon svg {
+  display: block;
+  overflow: visible;
+}
+
+/* Foggy Brain — 80% black glyph stays put; a blurred flare drifts across. */
+.grumble-brain-flare {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: grumble-brain-flare 5.6s ease-in-out infinite;
+}
+
+@keyframes grumble-brain-flare {
+  0% {
+    transform: translate(-11px, -3px);
+  }
+  50% {
+    transform: translate(11px, 4px);
+  }
+  100% {
+    transform: translate(-11px, -3px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .grumble-brain-flare {
+    animation: none;
+    transform: translate(0, 0);
+    opacity: 0.4;
+  }
+}
+
+/* Drained — charge bar goes full → empty, holds, then snaps back to full. */
+.grumble-battery-charge {
+  transform-box: fill-box;
+  transform-origin: left center;
+  animation: grumble-battery-drain 3.8s ease-in-out infinite;
+}
+
+@keyframes grumble-battery-drain {
+  0%,
+  12% {
+    transform: scaleX(1);
+  }
+  78%,
+  100% {
+    transform: scaleX(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .grumble-battery-charge {
+    animation: none;
+    transform: scaleX(0.12);
+  }
+}
+
+.grumble-symptom__label {
+  font-family: Switzer, 'Switzer Placeholder', sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 140%;
+  letter-spacing: 0;
+  color: #000;
+  text-wrap: pretty;
+}
+
+@media (max-width: 519.98px) {
+  .grumble-symptoms {
+    gap: 12px 12px;
+  }
+}
+
+.grumble-quote {
+  font-style: italic;
+  font-weight: 600;
+  color: #000;
+}
+
+/* -------------------------------------------------------------------- */
+/* "What We Found" — research-stat cards under the Problem section */
+/* -------------------------------------------------------------------- */
+
+.grumble-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+  margin: 0;
+}
+
+/* Same 140px section rhythm as the insights figure → Key Solutions
+   (.framer-172orq5). Parent #problem-1 (.framer-cx1uo5) already contributes 6px. */
+.framer-pR67w .framer-cx1uo5 > .grumble-stats {
+  margin-bottom: 134px;
+}
+
+@media (max-width: 1199.98px) {
+  .framer-pR67w .framer-cx1uo5 > .grumble-stats {
+    margin-bottom: 74px;
+  }
+}
+
+.grumble-stats__grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  width: 100%;
+  margin-top: 8px;
+  box-sizing: border-box;
+}
+
+.grumble-stat-card {
+  background: #fafafa;
+  padding: 24px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  /* The grid row stretches every card to the tallest one's height, so a short
+     caption used to leave the glyph stranded right under the copy with dead
+     air below it. `gap` stays as the floor between copy and glyph; `space-
+     between` sends any extra height from the row stretch into that same slot,
+     so the glyph — pictogram or ratio circles — always sits flush with the
+     card's own bottom edge instead of floating partway down. */
+  justify-content: space-between;
+  gap: 14px;
+  min-width: 0;
+}
+
+.grumble-stat-card__copy {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.grumble-stat-card__number {
+  font-family: 'Switzer', 'Switzer Placeholder', sans-serif;
+  font-size: 40px;
+  font-weight: 400;
+  line-height: 1;
+  color: #000;
+}
+
+.grumble-stat-card__number span {
+  font-family: inherit;
+  font-variant-numeric: normal;
+}
+
+.grumble-stat-card__caption {
+  margin: 0;
+  font-family: 'Switzer', 'Switzer Placeholder', sans-serif;
+  font-size: 14px;
+  line-height: 150%;
+  color: rgba(0, 0, 0, 0.6);
+}
+
+/* Ten people, five per row: 5 full + 1 split = 55%. Fixed 24px tracks, not
+   `1fr` — a fluid column scales with the card's own width, and the card goes
+   nearly full-viewport at the single-column breakpoint, which is what blew
+   the people up to ~300px tall there. 24px matches RATIO_R*2 (RATIO_H), the
+   fixed height the "1 in N" circles already use, so both glyphs read at the
+   same size everywhere instead of only agreeing on wide desktop cards. */
+.grumble-pictogram {
+  display: grid;
+  grid-template-columns: repeat(5, 24px);
+  align-items: center;
+  gap: 6px;
+}
+
+.grumble-pictogram__cell {
+  width: 24px;
+  height: 24px;
+  overflow: visible;
+  color: #e4e4e4;
+}
+
+.grumble-pictogram__cell--on {
+  color: #FF9735;
+  animation: grumble-pictogram-in 260ms cubic-bezier(0.23, 1, 0.32, 1) both;
+  animation-delay: calc(var(--i) * 40ms);
+}
+
+.grumble-pictogram__cell--half {
+  animation: grumble-pictogram-in 260ms cubic-bezier(0.23, 1, 0.32, 1) both;
+  animation-delay: calc(var(--i) * 40ms);
+}
+
+.grumble-pictogram__half-fill {
+  color: #FF9735;
+  clip-path: inset(0 50% 0 0);
+}
+
+@keyframes grumble-pictogram-in {
+  from {
+    opacity: 0;
+    transform: scale(0.85);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* "1 in 2" — a discrete pair rather than a directional fill, so it reads as a
+   different chart from the pictogram sharing its row. */
+/* Same height as a pictogram person. */
+.grumble-ratio {
+  display: block;
+  flex: none;
+  align-self: flex-start;
+  /* No fixed aspect-ratio here on purpose: that was hardcoded to the 2-circle
+     glyph's own proportions (56/24), so a wider "1 in 4" svg (viewBox
+     120/24) got squeezed into the same box and its circles rendered nearly
+     half the size of the 2-circle ones. Leaving width unset lets each glyph
+     keep its own intrinsic ratio from its viewBox, so a 24px height maps
+     viewBox units to CSS px at a consistent 1:1 scale for every total —
+     every circle ends up the same physical size regardless of how many
+     there are. */
+  height: 24px;
+  margin-inline: 0;
+  overflow: visible;
+}
+
+.grumble-ratio__mark {
+  transform-box: fill-box;
+  transform-origin: center;
+  opacity: 0;
+}
+
+/* Filled mark lands first; the empty one follows a beat later, so the card
+   states the "1" before it states the "of 2". */
+.grumble-stat-card[data-in] .grumble-ratio__mark {
+  animation: grumble-ratio-in 340ms cubic-bezier(0.23, 1, 0.32, 1) both;
+  animation-delay: calc(var(--i) * 70ms);
+}
+
+@keyframes grumble-ratio-in {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@media (max-width: 1199.98px) {
+  .grumble-stats__grid {
+    grid-template-columns: 1fr;
+  }
+
+  /* Two rows of 5 exists to fit the pictogram inside a card that's only 1/3 the
+     row's width. Once the cards stack single-column here, the card is full
+     width and 10 fit on one row same as they used to — the row split was never
+     about the people themselves, just the narrower desktop card. */
+  .grumble-pictogram {
+    grid-template-columns: repeat(10, 24px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .grumble-pictogram__cell--on,
+  .grumble-pictogram__cell--half {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+
+  .grumble-ratio__mark,
+  .grumble-stat-card[data-in] .grumble-ratio__mark {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Inline radio mark after "signal" in The Problem h1 — 1em so it matches
+   the 20px title, sat on the same line. */
+.grumble-title-radio {
+  display: inline-flex;
+  vertical-align: -0.18em;
+  width: 1em;
+  height: 1em;
+  margin-inline: 0.16em;
+  color: currentColor;
+}
+
+.grumble-title-radio svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* Ideation HMW — inline emoji. pre-wrap on .grumble-rt would turn JSX
+   newlines into hard breaks, so this lockup uses normal wrap. */
+.framer-pR67w .grumble-rt:has(.grumble-hmw) {
+  white-space: normal;
+}
+
+.grumble-hmw-emoji {
+  display: inline-block;
+  font-size: 1.05em;
+  line-height: 1;
+  vertical-align: 0em;
+}
+
+/* ------------------------------------------------------------------- */
+/* Reel — custom-controlled highlight video under the Overview intro.  */
+/* ------------------------------------------------------------------- */
+
+.grumble-reel {
+  position: relative;
+  width: 100%;
+  /* Fixed to the source's own 1920x1080 ratio, rather than letting the video
+     drive the container's height via its intrinsic size. At some fractional
+     container widths (the exact remainder shifts with viewport, which is why
+     this only showed up past ~1600px) a <video> — a replaced element — can
+     round to a whole device pixel differently than the plain box around it
+     during paint, even though getBoundingClientRect() reports identical
+     layout widths for both. That 1px shortfall let the black background
+     underneath show through as a hairline on the right edge. Since the video
+     is now absolutely positioned to fill this box exactly (object-fit:
+     cover), rather than being sized from its own intrinsic ratio, there's no
+     second, independently-rounded box left to fall short of the first. */
+  aspect-ratio: 16 / 9;
+  margin: var(--case-study-media-gap) 0 0;
+  background: #000;
+  overflow: hidden;
+}
+
+.grumble-reel__hit {
+  display: block;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  position: relative;
+}
+
+.grumble-reel__video {
+  display: block;
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  /* Zoomed 0.5% from centre. The frame (.grumble-reel, overflow: hidden) stays
+     the same size — this only crops a hair more off each edge of the video
+     itself, rather than growing the box it sits in. */
+  transform: scale(1.005);
+}
+
+/* Play/pause glyph — shown on hover always (as an affordance), and held
+   visible (not just on hover) whenever the reel is actually paused, so the
+   paused state reads at a glance without needing to hover to confirm it. */
+.grumble-reel__playstate {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  opacity: 0;
+  transition: opacity 160ms ease;
+  pointer-events: none;
+}
+
+.grumble-reel__playstate::before {
+  content: '';
+  position: absolute;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(2px);
+}
+
+.grumble-reel__playstate svg {
+  position: relative;
+  z-index: 1;
+}
+
+.grumble-reel__playstate--show {
+  opacity: 1;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .grumble-reel:hover .grumble-reel__playstate {
+    opacity: 1;
+  }
+}
+
+/* Mute toggle — top right, hover-revealed. */
+.grumble-reel__top {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  z-index: 2;
+  opacity: 0;
+  transform: translateY(-4px);
+  transition: opacity 180ms cubic-bezier(0.23, 1, 0.32, 1), transform 180ms cubic-bezier(0.23, 1, 0.32, 1);
+  pointer-events: none;
+}
+
+.grumble-reel:hover .grumble-reel__top,
+.grumble-reel:focus-within .grumble-reel__top {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+.grumble-reel__mute {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(4px);
+  color: #fff;
+  cursor: pointer;
+  transition: transform 160ms cubic-bezier(0.23, 1, 0.32, 1), background 160ms ease;
+}
+
+.grumble-reel__mute:hover {
+  background: rgba(0, 0, 0, 0.6);
+}
+
+.grumble-reel__mute:active {
+  transform: scale(0.94);
+}
+
+/* Scrubber — bottom bar, hover-revealed. */
+.grumble-reel__scrub {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px 12px;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.55), rgba(0, 0, 0, 0));
+  opacity: 0;
+  transform: translateY(6px);
+  transition: opacity 180ms cubic-bezier(0.23, 1, 0.32, 1), transform 180ms cubic-bezier(0.23, 1, 0.32, 1);
+  pointer-events: none;
+}
+
+.grumble-reel:hover .grumble-reel__scrub,
+.grumble-reel:focus-within .grumble-reel__scrub {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+.grumble-reel__time {
+  flex: none;
+  font-family: 'Switzer', 'Switzer Placeholder', sans-serif;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: rgba(255, 255, 255, 0.85);
+  min-width: 30px;
+}
+
+.grumble-reel__time:last-child {
+  text-align: right;
+}
+
+.grumble-reel__track {
+  position: relative;
+  flex: 1 1 0;
+  height: 14px;
+  display: flex;
+  align-items: center;
+}
+
+.grumble-reel__track::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 3px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.grumble-reel__track-fill {
+  position: absolute;
+  left: 0;
+  height: 3px;
+  border-radius: 999px;
+  background: #FF9735;
+  pointer-events: none;
+}
+
+.grumble-reel__range {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  margin: 0;
+  height: 14px;
+  background: transparent;
+  -webkit-appearance: none;
+  appearance: none;
+  cursor: pointer;
+}
+
+.grumble-reel__range::-webkit-slider-runnable-track {
+  height: 14px;
+  background: transparent;
+}
+
+.grumble-reel__range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.15);
+  margin-top: 1px;
+  transition: transform 120ms ease;
+}
+
+.grumble-reel__range:hover::-webkit-slider-thumb,
+.grumble-reel__range:active::-webkit-slider-thumb {
+  transform: scale(1.15);
+}
+
+.grumble-reel__range::-moz-range-track {
+  height: 14px;
+  background: transparent;
+}
+
+.grumble-reel__range::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  border: 0;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.15);
+}
+
+@media (hover: none) {
+  /* Touch devices: no hover, so keep the mute toggle and scrubber reachable
+     without ever revealing on tap-hold. */
+  .grumble-reel__top,
+  .grumble-reel__scrub {
+    opacity: 1;
+    transform: none;
+    pointer-events: auto;
+    background: linear-gradient(to top, rgba(0, 0, 0, 0.55), rgba(0, 0, 0, 0));
+  }
+
+  .grumble-reel__top {
+    background: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .grumble-reel__playstate,
+  .grumble-reel__top,
+  .grumble-reel__scrub,
+  .grumble-reel__mute {
+    transition: none;
+  }
+}
+
+/* "Next On" reads as its own section after Takeaways, not a continuation of
+   it — same 134px/74px section-rhythm step used elsewhere on this page
+   (Overview → My Participation). .next-on is shared with the Lemon8 case
+   study too, but this file only loads on /grumble, so the extra space stays
+   scoped to this page. */
+.next-on {
+  margin-top: 134px;
+}
+
+@media (max-width: 1199.98px) {
+  .next-on {
+    margin-top: 74px;
+  }
+}
+
+/* ------------------------------------------------------------------- */
+/* Hero stage — falling/draggable emoji canvas behind the phone mockups, */
+/* traced off cherryhu.com/grumble's own hero (same layered-fade recipe: */
+/* canvas -> page-bg fade -> frosted bottom blur -> image on top).       */
+/* ------------------------------------------------------------------- */
+
+.grumble-hero-stage {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1600 / 860;
+  padding: 40px 0;
+  box-sizing: border-box;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #FFFCF4;
+}
+
+.grumble-hero-stage__img {
+  position: relative;
+  z-index: 4;
+}
+
+.grumble-emoji-scatter {
+  position: absolute;
+  /* Spans the frame edge to edge. The stage's 40px padding exists to inset
+     the phone mockups, not the emoji — absolutely positioned children ignore
+     that padding anyway, so restating it here only pushed the drop-in zone
+     down and made emoji appear to enter partway into the frame instead of
+     from its top edge. */
+  inset: 0;
+}
+
+.grumble-emoji-scatter__canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+}
+
+/* Fades the canvas out toward the bottom into the page's own white, so the
+   settled pile doesn't end on a hard edge. */
+.grumble-emoji-scatter__fade {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(rgba(255, 252, 244, 0) 0%, rgb(255, 252, 244) 100%);
+  pointer-events: none;
+  z-index: 2;
+}
+
+/* A second, stronger frosted fade just over the bottom strip, so any emoji
+   piled at the floor blur away rather than clip. Height matches the fade's
+   original extent; the alpha ramp is gentler and the blur radius lighter
+   than the first pass so emoji read as solid rather than hazy through most
+   of the strip — only the last stretch actually washes out. */
+.grumble-emoji-scatter__blur {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 28%;
+  background: linear-gradient(
+    rgba(255, 252, 244, 0) 0%,
+    rgba(255, 252, 244, 0.35) 55%,
+    rgba(255, 252, 244, 0.8) 80%,
+    rgb(255, 252, 244) 100%
+  );
+  backdrop-filter: blur(4px);
+  -webkit-mask-image: linear-gradient(transparent 0%, black 65%);
+  mask-image: linear-gradient(transparent 0%, black 65%);
+  pointer-events: none;
+  z-index: 3;
+}
+
+@media (max-width: 700px) {
+  .grumble-hero-stage {
+    /* Same ratio as desktop — this is one flat image, not a grid that
+       reflows into fewer columns, so it needs the same proportions at every
+       width or it just gets cramped. Only the padding shrinks. */
+    padding: 24px 0;
+  }
+
+  .grumble-emoji-scatter {
+    inset: 0;
+  }
+}
+
+/* The two lines under "Check out our slide presentation" — the loading hint
+   sits its own 12px below the intro paragraph, independent of the 16px gap
+   .framer-eahql (from casestudy.css) already uses between Eyebrow/Title/Body. */
+.grumble-deck-note {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  /* The section wrapper (.framer-eahql) centers its children. Its other
+     children all set width: 100%, so that centering is a no-op for them —
+     but this one sizes to its content, so without opting out it gets centred
+     and the copy sits indented from the eyebrow and title above it. */
+  align-self: stretch;
+}
+
+/* Two photos side by side at a matched height. Each column's flex-grow is set
+   to its image's aspect ratio (via --ar), so the columns divide the row in
+   proportion to those ratios — which is what makes both images land on the
+   same height without either being cropped. flex-basis 0 keeps the intrinsic
+   image widths out of the calculation. */
+.grumble-photo-row {
+  display: flex;
+  align-items: flex-start;
+  /* Same gap as takeaway cards in .framer-z42bak. */
+  gap: 24px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.grumble-photo-row > .grumble-figure {
+  flex: var(--ar) 1 0;
+  min-width: 0;
+}
+
+@media (max-width: 700px) {
+  .grumble-photo-row {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .grumble-photo-row > .grumble-figure {
+    flex: 0 0 auto;
+    width: 100%;
+  }
+}

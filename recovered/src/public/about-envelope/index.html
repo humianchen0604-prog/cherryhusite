@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta id="color-scheme-meta" name="color-scheme" content="light" />
+    <title>Cherry Hu — About</title>
+    <script>
+      (function () {
+        var q = new URLSearchParams(location.search);
+        var embed = q.get("embed") === "1" || q.get("embed") === "true";
+        var night = q.get("theme") === "dark";
+        var root = document.documentElement;
+        if (embed) root.classList.add("embed-mode");
+        if (night) root.classList.add("night");
+        root.style.colorScheme = night ? "dark" : "light";
+        root.style.background = "transparent";
+        var meta = document.getElementById("color-scheme-meta");
+        if (meta) meta.setAttribute("content", night ? "dark" : "light");
+      })();
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;600&family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Outfit:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      rel="stylesheet"
+      href="https://api.fontshare.com/v2/css?f[]=switzer@400,500&display=swap"
+    />
+    <script type="module" crossorigin src="/about-envelope/assets/index-DafS316R.js"></script>
+    <link rel="stylesheet" crossorigin href="/about-envelope/assets/index-VE7YW7J_.css">
+  </head>
+  <body>
+    <div id="root"></div>
+  </body>
+</html>

@@ -1,0 +1,774 @@
+/* TikTok internship — additions on top of casestudy.css.
+ * Shares the Lemon8/Grumble shell; only TikTok-specific patterns live here. */
+
+.framer-pR67w .tiktok-rt {
+  position: relative;
+  flex: 0 0 auto;
+  width: 100%;
+  height: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-wrap: break-word;
+}
+
+.framer-pR67w .tiktok-rt > h5.framer-styles-preset-1w502i7 {
+  --framer-text-color: rgba(0, 0, 0, 0.6);
+}
+
+.framer-pR67w p.framer-styles-preset-ybrah6.tiktok-body--ink {
+  /* Two steps under the project title (20px → 18px). */
+  --framer-font-size: 18px;
+  --framer-line-height: 140%;
+  --framer-text-color: rgb(0, 0, 0);
+  color: rgb(0, 0, 0);
+}
+
+.tiktok-highlight {
+  position: relative;
+  z-index: 0;
+  display: inline;
+  color: inherit;
+}
+
+.tiktok-highlight::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0.02em;
+  height: calc(0.2em + 2px);
+  background-color: #69C9D0;
+  -webkit-mask-image: url('/assets/images/lemon8-highlight-stroke.svg');
+  mask-image: url('/assets/images/lemon8-highlight-stroke.svg');
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-size: 100% 100%;
+  mask-size: 100% 100%;
+  z-index: -1;
+}
+
+.tiktok-hub {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  width: 100%;
+  margin-top: 8px;
+}
+
+@media (max-width: 809.98px) {
+  .tiktok-hub {
+    grid-template-columns: 1fr;
+  }
+}
+
+.tiktok-hub__card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 20px 18px;
+  background: #fafafa;
+  text-decoration: none;
+  color: inherit;
+  box-sizing: border-box;
+  transition: transform 200ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .tiktok-hub__card:hover {
+    transform: scale(1.02);
+  }
+}
+
+.tiktok-hub__num {
+  font-family: 'Switzer', 'Switzer Placeholder', sans-serif;
+  font-size: 12px;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: rgba(0, 0, 0, 0.4);
+}
+
+.tiktok-hub__title {
+  margin: 0;
+  font-family: 'Switzer', 'Switzer Placeholder', sans-serif;
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 1.3;
+  color: rgba(0, 0, 0, 0.88);
+}
+
+.tiktok-hub__blurb {
+  margin: 0;
+  font-family: 'Switzer', 'Switzer Placeholder', sans-serif;
+  font-size: 13px;
+  line-height: 1.45;
+  color: rgba(0, 0, 0, 0.55);
+}
+
+.tiktok-project {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+  scroll-margin-top: 60px;
+}
+
+.tiktok-slot {
+  width: 100%;
+  box-sizing: border-box;
+  background: #f0f0f0;
+  aspect-ratio: 16 / 9;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.tiktok-media-pair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-rows: auto auto auto;
+  column-gap: 16px;
+  row-gap: 12px;
+  width: 100%;
+  box-sizing: border-box;
+  /* Project gap 16 + this = 36 (50% more than prior 24). */
+  margin-top: 20px;
+  align-items: start;
+}
+
+.tiktok-media-duo {
+  --tiktok-duo-gap: 12px;
+  container-type: inline-size;
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  gap: var(--tiktok-duo-gap);
+  width: 100%;
+  box-sizing: border-box;
+  margin-top: 20px;
+}
+
+.tiktok-media-duo__video {
+  /* 75% of remaining space after the gap */
+  flex: 0 0 calc((100% - var(--tiktok-duo-gap)) * 0.75);
+  width: calc((100% - var(--tiktok-duo-gap)) * 0.75);
+  max-width: calc((100% - var(--tiktok-duo-gap)) * 0.75);
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: transparent;
+  align-self: flex-start;
+}
+
+.tiktok-media-duo__video-frame {
+  width: 100%;
+  aspect-ratio: 2288 / 1838;
+  overflow: hidden;
+  background: transparent;
+  border: none;
+  outline: none;
+  box-shadow: none;
+}
+
+.tiktok-media-duo__video-frame video {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+  background: transparent;
+  border: none;
+  outline: none;
+  box-shadow: none;
+  transform: scale(1.01);
+  transform-origin: center center;
+}
+
+.tiktok-media-duo__image {
+  /* 25% of remaining space after the gap */
+  flex: 0 0 calc((100% - var(--tiktok-duo-gap)) * 0.25);
+  width: calc((100% - var(--tiktok-duo-gap)) * 0.25);
+  max-width: calc((100% - var(--tiktok-duo-gap)) * 0.25);
+  min-width: 0;
+  /* Match video frame height: 75% of (container − gap) × aspect */
+  height: calc((100cqi - var(--tiktok-duo-gap)) * 0.75 * 1838 / 2288);
+  max-height: calc((100cqi - var(--tiktok-duo-gap)) * 0.75 * 1838 / 2288);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background: #fafafa;
+  box-sizing: border-box;
+  padding: 0;
+  align-self: flex-start;
+}
+
+.tiktok-media-duo__image img {
+  display: block;
+  width: 70%;
+  height: auto;
+  max-width: 70%;
+  max-height: 100%;
+  object-fit: contain;
+  object-position: center;
+}
+
+@media (max-width: 809.98px) {
+  .tiktok-media-duo {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 16px;
+  }
+
+  .tiktok-media-duo__video {
+    flex: none;
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .tiktok-media-duo__image {
+    flex: none;
+    width: 100%;
+    max-width: 100%;
+    height: auto;
+    max-height: none;
+    min-height: 220px;
+    aspect-ratio: 1024 / 560;
+    padding: 0;
+  }
+
+  .tiktok-media-duo__image img {
+    width: 70%;
+    max-width: 70%;
+    height: auto;
+    max-height: 100%;
+  }
+}
+
+.tiktok-media-trio {
+  container-type: inline-size;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: 12px;
+  width: 100%;
+  box-sizing: border-box;
+  margin-top: 20px;
+  align-items: start;
+}
+
+.tiktok-media-trio__main {
+  min-width: 0;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  overflow: hidden;
+}
+
+.tiktok-media-trio__side {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+  /* Equal columns: left square height = (trio width - column gap) / 2 */
+  height: calc((100cqi - 12px) / 2);
+}
+
+.tiktok-media-trio__side .tiktok-media {
+  flex: 1 1 0;
+  min-height: 0;
+  min-width: 0;
+  width: 100%;
+  aspect-ratio: auto;
+  overflow: hidden;
+}
+
+.tiktok-media-trio__main video {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+  background: transparent;
+  transform: scale(1.18);
+  transform-origin: center center;
+}
+
+.tiktok-media-trio__side .tiktok-media video {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+  background: transparent;
+}
+
+.tiktok-media-trio__side .tiktok-media:nth-child(2) video {
+  transform: scale(1.7);
+  transform-origin: center center;
+}
+
+/* The trio and the pair keep their desktop two-column arrangement at every width:
+   a square main video beside two stacked ones, and issue #1 beside issue #2. They
+   used to collapse to one column below 810px, which made each video the full
+   width of the screen. */
+
+.tiktok-media-col {
+  display: grid;
+  grid-template-rows: subgrid;
+  grid-row: span 3;
+  min-width: 0;
+}
+
+.tiktok-media-lead {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-self: start;
+}
+
+.tiktok-media-lead .framer-1sfabqy,
+.tiktok-media-lead .framer-styles-preset-ybrah6,
+.tiktok-media-lead .tiktok-rt {
+  max-width: none;
+  width: 100%;
+}
+
+.tiktok-media-lead .framer-styles-preset-1w502i7 {
+  --framer-text-color: rgba(254, 44, 85, 0.55);
+  color: rgba(254, 44, 85, 0.55);
+}
+
+.tiktok-media-col .tiktok-slot {
+  aspect-ratio: 1840 / 1838;
+}
+
+.tiktok-media {
+  width: 100%;
+  overflow: hidden;
+  background: #f0f0f0;
+  align-self: start;
+}
+
+.tiktok-media--lockable {
+  position: relative;
+}
+
+.tiktok-media-lock {
+  position: absolute;
+  left: 20px;
+  bottom: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px;
+  background: #fff;
+  border: 0.5px solid #e5e5e5;
+  border-radius: 4px;
+  color: #8a8a8a;
+  box-sizing: border-box;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.tiktok-media-caption {
+  margin: 0;
+  width: 100%;
+  max-width: none;
+  text-align: center;
+  font-family: 'Switzer', 'Switzer Placeholder', sans-serif;
+  font-size: 14px;
+  line-height: 154%;
+  color: rgba(0, 0, 0, 0.6);
+  align-self: start;
+}
+
+.tiktok-slot__inner {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: center;
+  text-align: center;
+  max-width: 28em;
+}
+
+.tiktok-slot__kind {
+  font-family: 'Switzer', 'Switzer Placeholder', sans-serif;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(0, 0, 0, 0.35);
+}
+
+.tiktok-slot__label {
+  font-family: 'Switzer', 'Switzer Placeholder', sans-serif;
+  font-size: 13px;
+  line-height: 1.4;
+  color: rgba(0, 0, 0, 0.45);
+}
+
+/* 2×2 takeaway cards — same #fafafa / night-glass plates as .framer-z42bak. */
+.framer-pR67w .framer-z42bak.tiktok-takeaway-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: stretch;
+  gap: 24px;
+  width: 100%;
+}
+
+.framer-pR67w .framer-z42bak.tiktok-takeaway-grid > .framer-107fbv6 {
+  flex: unset;
+  width: auto;
+  min-width: 0;
+  height: auto;
+}
+
+@media (max-width: 1199.98px) {
+  .framer-pR67w .framer-z42bak.tiktok-takeaway-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+}
+
+.tiktok-hero-logo {
+  width: 16pt;
+  height: 16pt;
+  border-radius: 22%;
+  object-fit: cover;
+  flex-shrink: 0;
+  /* Hairline white stroke. It has to be an outer ring: an inset shadow on an <img>
+     is painted underneath the picture, so the old inset one never showed. */
+  box-shadow: 0 0 0 0.5px rgb(255 255 255 / 0.2);
+}
+
+/* Project narrative blocks */
+.tiktok-phase {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: 100%;
+  box-sizing: border-box;
+  margin-top: 8px;
+  overflow: visible;
+}
+
+/* Solution label + body: match lead→steps rhythm (14px). */
+.tiktok-solution {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 14px;
+  width: 100%;
+  /* Project gap 16 + this = 54 (50% more than prior 36). */
+  margin-top: 38px;
+  overflow: visible;
+}
+
+.tiktok-solution .tiktok-phase {
+  margin-top: 0;
+}
+
+.tiktok-metrics {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-flow: row wrap;
+  gap: 10px;
+  width: 100%;
+}
+
+.tiktok-metrics li {
+  flex: 1 1 140px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 14px 16px;
+  background: #fafafa;
+  box-sizing: border-box;
+}
+
+.tiktok-metrics--grid li {
+  flex: 1 1 120px;
+}
+
+.tiktok-metrics__value {
+  font-family: 'Switzer', 'Switzer Placeholder', sans-serif;
+  font-size: 18px;
+  font-weight: 500;
+  line-height: 1.2;
+  color: rgba(0, 0, 0, 0.88);
+}
+
+.tiktok-metrics__label {
+  font-family: 'Switzer', 'Switzer Placeholder', sans-serif;
+  font-size: 12px;
+  line-height: 1.35;
+  color: rgba(0, 0, 0, 0.5);
+}
+
+.tiktok-insight {
+  margin: 0;
+  padding: 14px 16px;
+  background: #fafafa;
+  font-family: 'Switzer', 'Switzer Placeholder', sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  color: rgba(0, 0, 0, 0.78);
+  box-sizing: border-box;
+}
+
+.tiktok-insight__mark {
+  display: inline-block;
+  margin-right: 8px;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(0, 0, 0, 0.4);
+  font-weight: 500;
+}
+
+.tiktok-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+}
+
+.tiktok-steps li {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  font-family: 'Switzer', 'Switzer Placeholder', sans-serif;
+  /* Match body preset (ybrah6): 14px scaled. */
+  font-size: calc(14px * var(--text-scale, 1));
+  line-height: 154%;
+  color: rgba(0, 0, 0, 0.72);
+}
+
+.tiktok-steps__icon {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #6e6e6e;
+  margin-top: 4px;
+}
+
+/* Handwritten collab note — same Caveat + squiggle as Design Journey.
+ * Hangs into the case-study right padding (outside the text measure). */
+.tiktok-collab {
+  position: relative;
+  width: 100%;
+  overflow: visible;
+}
+
+.tiktok-collab .tiktok-media {
+  background: transparent;
+  border: none;
+  outline: none;
+  box-shadow: none;
+}
+
+.tiktok-collab .tiktok-media video {
+  border: none;
+  outline: none;
+  box-shadow: none;
+  /* Avoid Safari/WebKit hairline on video edges */
+  -webkit-mask-image: -webkit-radial-gradient(white, black);
+}
+
+.tiktok-collab__hint {
+  position: absolute;
+  left: calc(100% + 28px);
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 20px;
+  pointer-events: none;
+  z-index: 2;
+  color: rgba(0, 0, 0, 0.55);
+}
+
+.tiktok-collab__copy {
+  position: relative;
+  transform: rotate(-16deg);
+  font-family: 'Caveat', cursive;
+  font-size: calc(clamp(12px, 1.95vw, 18px) * var(--text-scale, 1));
+  line-height: 1.15;
+  color: inherit;
+  white-space: nowrap;
+}
+
+.tiktok-collab__copy p {
+  margin: 0;
+}
+
+.tiktok-collab__arrow {
+  width: 28px;
+  height: 25px;
+  display: block;
+  flex: none;
+  opacity: 0.85;
+  /* Flip so the squiggle points left at the solution copy. */
+  transform: translate(-6px, 0) scaleX(-1) rotate(8deg);
+}
+
+/* The arrow is a black-filled SVG in an <img>; invert it to white in night mode. */
+:root[data-theme='dark'] .tiktok-collab__arrow {
+  filter: invert(1);
+}
+
+/* Tablet / phone: the collab note stops being a tilted handwritten aside and
+ * becomes an ordinary caption for the video above it, styled like
+ * .tiktok-media-caption — centred Switzer, 14px, muted — with the arrow sitting
+ * above it and pointing up at the video it credits. */
+@media (max-width: 1199.98px) {
+  .tiktok-collab__hint {
+    position: relative;
+    left: auto;
+    top: auto;
+    transform: none;
+    margin: 10px 0 0;
+    gap: 6px;
+    /* Arrow first, text second — the markup has them the other way round. */
+    flex-direction: column-reverse;
+    align-items: center;
+    width: 100%;
+    color: rgba(0, 0, 0, 0.6);
+  }
+
+  .tiktok-collab__copy {
+    transform: none;
+    text-align: center;
+    font-family: 'Switzer', 'Switzer Placeholder', sans-serif;
+    font-size: 14px;
+    line-height: 154%;
+    white-space: normal;
+  }
+
+  /* Three separate <p>s in the markup, read as one sentence. */
+  .tiktok-collab__copy p {
+    display: inline;
+  }
+
+  .tiktok-collab__copy p + p::before {
+    content: ' ';
+  }
+
+  .tiktok-collab__arrow {
+    width: 22px;
+    height: 20px;
+    transform: rotate(-90deg);
+  }
+}
+
+/* Reach-out as Loom-style note card: icon | copy | gate (3 columns). */
+.reach-out--note {
+  display: grid;
+  grid-template-columns: 78px minmax(0, 5fr) minmax(0, 4fr);
+  column-gap: 12px;
+  align-items: center;
+  width: 100%;
+  box-sizing: border-box;
+  background: transparent;
+  border: 0.75px solid rgba(0, 0, 0, 0.13);
+  border-radius: 10px;
+  padding: 20px 24px 20px 10px;
+  margin-top: 8px;
+}
+
+.reach-out--note .reach-out__art {
+  width: 78px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.reach-out--note .reach-out__art-badge {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  background: #f0f0f0;
+  color: #404040;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.reach-out--note .reach-out__lock {
+  width: 22px;
+  height: 22px;
+  margin-top: 0;
+  color: inherit;
+}
+
+.reach-out--note .reach-out__copy {
+  min-width: 0;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  text-align: left;
+}
+
+.reach-out--note .reach-out__topic {
+  margin: 0;
+  font-family: 'Switzer', 'Switzer Placeholder', sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 130%;
+  color: #000;
+}
+
+.reach-out--note .reach-out__lead {
+  margin: 0;
+  font-family: 'Switzer', 'Switzer Placeholder', sans-serif;
+  font-size: calc(14px * var(--text-scale, 1));
+  font-weight: 400;
+  line-height: 154%;
+  color: rgba(0, 0, 0, 0.6);
+}
+
+.reach-out--note .reach-out__gate {
+  min-width: 0;
+  width: 100%;
+  align-self: center;
+}
+
+@media (max-width: 1199.98px) {
+  .reach-out--note {
+    grid-template-columns: 1fr;
+    row-gap: 16px;
+    padding: 20px;
+  }
+
+  .reach-out--note .reach-out__art {
+    width: auto;
+    justify-content: flex-start;
+  }
+}
+
+/* Backup "button preview" — 4:3 cover video, not rendered.
+   Live bento styles live in components/casestudy/tiktok-bento.css. */
+.tiktok-button-preview {
+  box-sizing: border-box;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  padding: 12px;
+  background: #fafafa;
+  overflow: hidden;
+}
+
+.tiktok-button-preview video {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+}

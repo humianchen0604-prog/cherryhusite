@@ -1,0 +1,56 @@
+/* /explorations: the version list under the side nav (ExplorationSwitch). */
+.exploration-switch {
+  margin-top: 28px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 14px;
+  font-family: 'PP Neue Montreal', 'Helvetica Neue', Helvetica, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+.exploration-switch__group {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+}
+
+.exploration-switch__caption {
+  font-size: calc(1rem * 0.66 * var(--text-scale, 1));
+  line-height: 1.4;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: rgb(var(--fg-rgb) / 0.35);
+}
+
+.exploration-switch__caption--sub {
+  letter-spacing: 0.02em;
+  text-transform: none;
+  color: rgb(var(--fg-rgb) / 0.3);
+}
+
+.exploration-switch__caption em {
+  font-style: normal;
+}
+
+.exploration-switch__option {
+  background: none;
+  border: none;
+  cursor: pointer;
+  margin: 0;
+  padding: 3px 0;
+  font: inherit;
+  font-size: calc(1rem * 0.78 * var(--text-scale, 1));
+  line-height: 1.4;
+  text-align: left;
+  white-space: nowrap;
+  outline: none;
+}
+
+/* Only "Current" shows the live blue sky (SkyGradient); every other version
+   brings its own sky or sits on the plain page, as it did when explored. */
+:root[data-exploration]:not([data-exploration='current']) .sky-gradient {
+  display: none;
+}

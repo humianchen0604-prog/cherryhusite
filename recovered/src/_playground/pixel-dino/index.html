@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Pixel Dino</title>
+  <!--
+    Adapted from "dry-mayfly-12" by 20essentials on Uiverse.io (MIT License,
+    Copyright (c) 2023 Uiverse.io). Sprite redrawn as a readable pixel map;
+    the pixels are generated at runtime instead of ~1,700 hand-written shadows.
+  -->
+  <style>
+    :root {
+      --bg: #e1e4e7;
+      --ink: #464646;
+      --outline: #fcfcfc;
+      --grid: rgb(255 255 255 / 0.42); /* hairline between pixels */
+      --px: 7px;                        /* size of one sprite pixel */
+      --speed: 0.3s;                    /* one full stride (3 frames) */
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      background: var(--bg);
+    }
+
+    .dino {
+      display: grid;
+      grid-template-columns: repeat(24, var(--px));
+      grid-auto-rows: var(--px);
+      /* 1-pixel white outline: stacked drop-shadows dilate the shape
+         in all 8 directions */
+      filter:
+        drop-shadow(calc(var(--px) * -1) 0 0 var(--outline))
+        drop-shadow(0 calc(var(--px) * -1) 0 var(--outline))
+        drop-shadow(var(--px) 0 0 var(--outline))
+        drop-shadow(0 var(--px) 0 var(--outline));
+    }
+
+    .dino i {
+      background: var(--ink);
+      box-shadow: inset -0.5px -0.5px 0 var(--grid);
+    }
+
+    /* Empty cells and leg pixels that aren't in the current frame */
+    .dino i.off { background: transparent; box-shadow: none; }
+
+    /* Leg pixels: visible only in the frames listed in data-on.
+       Keyframes for each combination are injected below. */
+    .dino i[data-on] {
+      animation: var(--steps) var(--speed) step-end infinite;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .dino i[data-on] { animation-play-state: paused; }
+    }
+  </style>
+</head>
+<body>
+  <div class="dino" id="dino" role="img" aria-label="Pixel dinosaur running"></div>
+
+  <script>
+    // 24×24 sprite. "#" = filled pixel. Body is shared; the legs swap per frame.
+    const BODY = [
+      ".............##########.",
+      "............############",
+      "............##..########",
+      "............##..########",
+      "............############",
+      "............############",
+      "............######......",
+      "............######......",
+      "............##########..",
+      "#.........#######.......",
+      "#.......#########.......",
+      "##.....############.....",
+      "###...###########.#.....",
+      "#################.......",
+      "#################.......",
+      ".################.......",
+      "..#############.........",
+      "...###########..........",
+      "....#########...........",
+      ".....#######............",
+    ];
+
+    const LEGS = [
+      [ // both feet down
+        "......###..##...........",
+        "......##....#...........",
+        "......#.....#...........",
+        "......##....##..........",
+      ],
+      [ // front foot up
+        "......###..###..........",
+        "......##................",
+        "......#.................",
+        "......##................",
+      ],
+      [ // back foot up
+        "......###..##...........",
+        ".......###..#...........",
+        "............#...........",
+        "............##..........",
+      ],
+    ];
+
+    const dino = document.getElementById("dino");
+    const keyframes = new Set();
+    const cells = [];
+
+    for (let y = 0; y < 24; y++) {
+      for (let x = 0; x < 24; x++) {
+        const cell = document.createElement("i");
+
+        if (y < BODY.length) {
+          if (BODY[y][x] !== "#") cell.className = "off";
+        } else {
+          // Which frames (0, 1, 2) this leg pixel is visible in
+          const on = LEGS.map((f) => f[y - BODY.length][x] === "#");
+          const key = on.map(Number).join(""); // e.g. "101"
+
+          if (key === "000") cell.className = "off";
+          else if (key !== "111") {
+            cell.dataset.on = key;
+            cell.style.setProperty("--steps", `legs-${key}`);
+            keyframes.add(key);
+          }
+        }
+        cells.push(cell);
+      }
+    }
+    dino.append(...cells);
+
+    // One keyframe per visibility pattern, e.g. legs-101 = on, off, on
+    const css = [...keyframes].map((key) => {
+      const stops = [...key].map((bit, i) => {
+        const pct = ((i * 100) / 3).toFixed(3);
+        return bit === "1"
+          ? `${pct}% { background: var(--ink); box-shadow: inset -0.5px -0.5px 0 var(--grid); }`
+          : `${pct}% { background: transparent; box-shadow: none; }`;
+      });
+      return `@keyframes legs-${key} { ${stops.join(" ")} }`;
+    });
+    const style = document.createElement("style");
+    style.textContent = css.join("\n");
+    document.head.append(style);
+  </script>
+</body>
+</html>

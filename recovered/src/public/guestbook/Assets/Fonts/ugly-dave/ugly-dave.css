@@ -1,0 +1,24 @@
+/*
+Font: 		Ugly Dave
+Style: 		Regular
+URL: 		https://youworkforthem.com/font/T13787/ugly-dave
+Foundry: 	Typeheist
+Foundry: 	https://youworkforthem.com/designer/1497/typeheist
+Copyright:	
+Version: 	18
+Created:	April 02, 2026
+License: 	https://www.youworkforthem.com/font-license 
+License: 	The WebFont(s) listed in this document must follow the YouWorkForThem
+			WebFont license rules. All other parties are strictly restricted 
+			from using the WebFonts(s) listed without a purchased license. 
+			All details above must always remain unaltered and visible in your CSS.
+*/
+
+@font-face {
+	font-family: 'UglyDaveRegular';
+	src: url('ugly-dave.woff2') format('woff2'),
+	     url('ugly-dave.woff') format('woff');
+	font-weight: normal;
+	font-style: normal;
+	font-display: swap;
+}

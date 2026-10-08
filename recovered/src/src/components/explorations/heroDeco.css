@@ -1,0 +1,65 @@
+/* --- hero pixel tulip ------------------------------------------------------
+ * Hangs off the right edge of the intro block, level with the grey
+ * "Currently in LA / Previously…" lines. Absolutely positioned inside
+ * .framer-a9nbwi (already position: relative) so it never moves the copy.
+ *
+ * The canvas includes 16 source units of padding on every side for the bloom
+ * to flare into, so the box is a little larger than the visible tulip:
+ * 312×448 source units for a 280×416 tulip.
+ */
+.hero-tulip {
+  --hero-tulip-grey: #c8c8c8;
+  position: absolute;
+  top: 44px;
+  right: -4px;
+  /* 72px, then +10%, +10%, +20% (72 → 79.2 → 87.12 → 104.54). Anchored by
+     top/right, so it grows down and to the left and keeps its top edge and
+     grid-aligned right edge. */
+  width: 104.54px;
+  /* Hover target: the intro wrapper and its children are pointer-events:
+     none (so empty space falls through to the lanyard), so opt back in. */
+  pointer-events: auto;
+  -webkit-tap-highlight-color: transparent;
+  /* Fades out from the bottom up: the root end dissolves into the page,
+     the heads stay solid. */
+  -webkit-mask-image: linear-gradient(to top, transparent 0%, #000 60%);
+  mask-image: linear-gradient(to top, transparent 0%, #000 60%);
+}
+
+:root[data-theme='dark'] .hero-tulip {
+  /* Translucent white so the resting grey sits on the navy night sky
+     rather than reading as a flat charcoal patch. */
+  --hero-tulip-grey: rgb(255 255 255 / 0.2);
+}
+
+.hero-tulip canvas {
+  display: block;
+  width: 100%;
+  aspect-ratio: 312 / 448;
+}
+
+/* --- decorative hero variants (HeroShapes, HeroFlowers) -------------------
+ * One box across the whole intro block, overhanging a little above and below
+ * and out to the right margin. Items land on a wavy line to the right of the
+ * copy, measured from the text itself (heroWave.ts), so only the outer bounds
+ * matter here. Never takes the pointer.
+ */
+.hero-deco {
+  position: absolute;
+  top: -40px;
+  left: 0;
+  /* An explicit width, not left + right: a <canvas> is a replaced element and
+     would keep its own intrinsic width instead of stretching between them. */
+  width: calc(100% + 36px);
+  height: 200px;
+  pointer-events: none;
+}
+
+/* Below the desktop layout the copy runs the full width, so the tulip would sit
+   on top of it. */
+@media (max-width: 1279.98px) {
+  .hero-tulip,
+  .hero-deco {
+    display: none;
+  }
+}
