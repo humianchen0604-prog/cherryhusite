@@ -1174,21 +1174,16 @@ a.loom-pill:active {
   margin-top: var(--case-study-media-gap);
 }
 
-/* Process reel ground — same #fafafa takeaway card token in light; night
-   overrides to the soft white panel in casestudy-dark.css. */
+/* The process diagram fills the column at its own aspect. The panel behind
+   it only shows if the image hasn't painted yet. */
 .loom-process-reel {
   background: #fafafa;
 }
 
-/* Overview media placeholder — plain #fafafa fill at the Solution video's
-   aspect ratio, rounded to read as a media block. */
-.loom-overview-placeholder {
-  background: #fafafa;
-  border-radius: 12px;
-}
-
-.loom-process-reel iframe {
-  background: transparent;
+.loom-process-reel img {
+  display: block;
+  width: 100%;
+  height: auto;
 }
 
 /* Inline folders mark after "place" in the HMW h1 — 1em so it matches the

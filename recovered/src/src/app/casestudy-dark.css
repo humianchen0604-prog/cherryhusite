@@ -357,8 +357,7 @@
 :root[data-theme='dark'] .casestudy-root :is(
   .loom-pair--card .loom-pair__col,
   .loom-step,
-  .loom-process-reel,
-  .loom-overview-placeholder
+  .loom-process-reel
 ) {
   background-color: rgb(255 255 255 / 0.07) !important;
   border: 0.5pt solid rgb(255 255 255 / 0.18) !important;

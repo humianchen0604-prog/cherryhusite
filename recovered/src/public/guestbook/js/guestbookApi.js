@@ -29,6 +29,29 @@
     }
   }
 
+  /**
+   * Local preview only (no cloud): the first ever seed replaces this
+   * browser's test notes with the live site's notes (js/seedEntries.js).
+   * A later seed version only swaps the seed notes themselves, so anything
+   * written in between is kept.
+   */
+  var SEED_FLAG_KEY = 'guestbook_seed_version';
+  function seedLocalIfNeeded() {
+    var seed = global.GuestbookSeed;
+    if (!seed || !Array.isArray(seed.entries)) return;
+    try {
+      var had = localStorage.getItem(SEED_FLAG_KEY);
+      if (had === seed.VERSION) return;
+      var kept = had
+        ? readLocal().filter(function (e) { return !(e && /^seed-/.test(String(e.id))); })
+        : [];
+      writeLocal(seed.entries.concat(kept));
+      localStorage.setItem(SEED_FLAG_KEY, seed.VERSION);
+    } catch (_e) {
+      /* storage blocked: nothing to replace */
+    }
+  }
+
   /** Union by id. Cloud wins on conflicts (shared source of truth). */
   function mergeById(cloud, local) {
     var byId = Object.create(null);
@@ -173,6 +196,8 @@
       /* ignore — positions can reconcile on next load */
     }
   }
+
+  if (!cloudEnabled()) seedLocalIfNeeded();
 
   global.GuestbookApi = {
     STORAGE_KEY: STORAGE_KEY,

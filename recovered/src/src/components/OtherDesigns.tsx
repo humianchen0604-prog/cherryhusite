@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type MouseEvent as ReactMouseEvent, type RefObject } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type RefObject } from 'react';
 import { createPortal } from 'react-dom';
 import { useReducedMotion } from 'motion/react';
 import { ArrowUpRightIcon, type ArrowUpRightIconHandle } from '@/components/icons/ArrowUpRightIcon';
@@ -17,8 +17,13 @@ import { CursorFollowPill, useCursorFollowPill } from '@/components/casestudy/Cu
  * The loop only runs while the tile is on screen (IntersectionObserver) —
  * images cycling off-screen is work nobody sees.
  *
- * Clicking any tile opens a preview overlay: the piece zooms up to centre over
- * a blurred page, with a short write-up beneath it (see Preview / PROJECTS).
+ * The grid is four across, two rows. Clicking a tile opens the zoomed view:
+ * every piece at the preview size, in one horizontal row with a scrollbar.
+ * Scrolling to the next piece slides the row with it — the one on screen
+ * travels off to the left as the next comes in, and back the other way.
+ * Close it with the corner button, a click on the empty frost, or Escape.
+ * Pinch, outside this grid, still opens a single preview, with the same
+ * three ways out.
  */
 
 const GAME = Array.from({ length: 7 }, (_, i) => `/assets/other-designs/game-ipad-0${i + 1}.webp`);
@@ -106,7 +111,7 @@ type Project = {
   description: string;
   /** Tools and materials, under the description. Left out when unknown. */
   credits?: string;
-  /** A live build, linked under the credits in the preview as "Try prototype ↗". */
+  /** A live build. In the zoomed preview it sits on the artwork as "Try prototype ↗". */
   link?: string;
   /** Soft blurred, washed-out edges on the card (a light vignette). */
   edgeBlur?: boolean;
@@ -139,6 +144,49 @@ const PINCH: Project = {
     poster: '/assets/other-designs/photo-app-frame.jpg',
     alt: 'Pinching two photos together to merge them, on a phone',
     fill: { y: 0.55, preview: 3 / 4 },
+  },
+};
+
+/* Beside Pinch in Recent prototypes. */
+const LANGUAGE: Project = {
+  id: 'language',
+  label: 'Visual feedback for speaking a new language',
+  pill: '244 244 242', // the app's off-white screen
+  title: 'Visual feedback for speaking a new language',
+  year: '2026',
+  description:
+    'Gentle mirror for learning a language: Words appear on the screen as you say them, so any drifting sound is easy to notice & correct in the moment.',
+  link: 'https://languagelearning-zeta.vercel.app/',
+  // Square 1080px H.264 capture (35MB) re-encoded to 832px: 0.55MB, audio
+  // kept for the preview's sound toggle — the spoken word is the point.
+  media: {
+    kind: 'video',
+    src: '/assets/other-designs/language.mp4',
+    poster: '/assets/other-designs/language-frame.jpg',
+    alt: 'Saying "papá" to a phone app that shows the pronunciation as it is spoken',
+    fill: {},
+    sound: true,
+  },
+};
+
+/* Third in Recent prototypes. */
+const TEXTING: Project = {
+  id: 'texting',
+  label: 'Text bubbles that feel what you say',
+  pill: '247 247 247', // the recording's pale grey backdrop
+  title: 'Text bubbles that feel what you say',
+  year: '2026',
+  description:
+    'Each bubble picks up the mood of its message, so a tired “I just woke up” looks as sleepy as it sounds.',
+  link: 'https://funtexting.vercel.app/',
+  // Silent 3360×1854 screen recording, cropped to the centred square around
+  // the phone and re-encoded to 832px at 30fps: 0.13MB.
+  media: {
+    kind: 'video',
+    src: '/assets/other-designs/texting.mp4',
+    poster: '/assets/other-designs/texting-frame.jpg',
+    alt: 'Texting on a phone: "I\'m so tired…" and "I just woke up" sent as bubbles that animate to match their mood',
+    fill: {},
   },
 };
 
@@ -400,6 +448,11 @@ function Flipbook({
  */
 const BEND_STRIP = 3; // canvas px per strip — steps in the curve stay sub-pixel
 
+/** The last canvas that painted each clip. A new copy (the zoomed view's) has
+ *  no frame until its own <video> loads and decodes, so it starts from this
+ *  one's pixels instead of opening on an empty panel. */
+const paintedBend = new Map<string, HTMLCanvasElement>();
+
 function BentVideo({
   src,
   alt,
@@ -451,13 +504,22 @@ function BentVideo({
     const draw = () => {
       const vw = video.videoWidth;
       const vh = video.videoHeight;
-      if (!visible || !vw) return;
+      // Metadata alone gives a size but no picture; clearing then would wipe
+      // the seeded frame and leave the panel empty until data arrives.
+      if (!visible || !vw || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) return;
       const sy = (trim * vh) / bend.h; // trimY is in the clip's own pixels
       ctx.clearRect(0, 0, cw, ch);
       for (const s of strips) {
         ctx.drawImage(video, s.u0 * vw, sy, Math.max(0.5, (s.u1 - s.u0) * vw), vh - sy * 2, s.dx, s.dy, s.dw, s.dh);
       }
+      paintedBend.set(src, canvas);
     };
+
+    // Already bent, so it only needs scaling to this backing store.
+    const seed = paintedBend.get(src);
+    if (seed && seed !== canvas && seed.isConnected && video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) {
+      ctx.drawImage(seed, 0, 0, cw, ch);
+    }
 
     // Redraw on each new video frame where supported, else every animation frame.
     let handle = 0;
@@ -483,8 +545,9 @@ function BentVideo({
       video.removeEventListener('loadeddata', draw);
       video.removeEventListener('seeked', draw);
       io.disconnect();
+      if (paintedBend.get(src) === canvas) paintedBend.delete(src);
     };
-  }, [bend.deg, bend.h, trim, cw, ch]);
+  }, [src, bend.deg, bend.h, trim, cw, ch]);
 
   return (
     <>
@@ -620,6 +683,7 @@ function Tile({
   return (
     <button
       type="button"
+      data-od-tile={project.id}
       className={`other-design${project.media.kind === 'video' && project.media.fill ? ' other-design--fill' : ''}${project.edgeBlur ? ' other-design--edge-blur' : ''}${className ? ` ${className}` : ''}${flown ? ' is-flown' : ''}`}
       aria-label={`Open preview: ${project.title}`}
       onClick={open}
@@ -707,13 +771,15 @@ function restingBox(el: HTMLElement) {
 
 /** "Try prototype" — the case studies' outbound pill (.loom-pill in
  *  loom/loom.css, mirrored in globals.css since that file only loads on the
- *  Loom page), with the same arrow that nudges on hover. */
-function PrototypeLink({ href }: { href: string }) {
+ *  Loom page), with the same arrow that nudges on hover.
+ *  `frame` pins it to the artwork: inside the bottom-right of the frame,
+ *  inset from both edges, white with black type and no stroke. */
+function PrototypeLink({ href, frame = false }: { href: string; frame?: boolean }) {
   const arrow = useRef<ArrowUpRightIconHandle>(null);
   const reduced = useReducedMotion();
   return (
     <a
-      className="od-preview__link"
+      className={`od-preview__link${frame ? ' od-preview__link--frame' : ''}`}
       href={href}
       target="_blank"
       rel="noopener noreferrer"
@@ -776,9 +842,89 @@ const clipOf = (art: HTMLElement) =>
 const reducedMotion = () =>
   typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
+/** How far past the screen edge a neighbor sits, so none of it shows while
+ *  one piece is parked in the centre. Shared by the resting layout and the
+ *  slide, so the end of a transition is the same place the layout would put it. */
+const neighborGap = (view: number, width: number) =>
+  Math.max(0, Math.ceil((view - width) / 2) + 4);
+
+/** One project sliding aside for the next. Long enough to watch the piece
+ *  travel, short enough that the next scroll still feels ready. */
+const SLIDE_MS = 620;
+const WHEEL_QUIET_MS = 180;
+
+/** Off-center size during a slide. The piece leaving shrinks from full size
+ *  to this; the piece arriving starts here and grows back to full size as it
+ *  reaches the centre. */
+const SLIDE_SCALE = 0.95;
+
+/** A CSS cubic-bezier(x1, y1, x2, y2) as a function of progress, for motion
+ *  driven frame by frame. Solves the curve's x for t (Newton, then bisection
+ *  where the slope is too flat), and returns its y. */
+function cubicBezier(x1: number, y1: number, x2: number, y2: number) {
+  const ax = 1 + 3 * x1 - 3 * x2;
+  const bx = 3 * x2 - 6 * x1;
+  const cx = 3 * x1;
+  const ay = 1 + 3 * y1 - 3 * y2;
+  const by = 3 * y2 - 6 * y1;
+  const cy = 3 * y1;
+  const xAt = (t: number) => ((ax * t + bx) * t + cx) * t;
+  const yAt = (t: number) => ((ay * t + by) * t + cy) * t;
+  const slopeX = (t: number) => (3 * ax * t + 2 * bx) * t + cx;
+  return (x: number) => {
+    if (x <= 0) return 0;
+    if (x >= 1) return 1;
+    let t = x;
+    for (let i = 0; i < 6; i++) {
+      const err = xAt(t) - x;
+      const d = slopeX(t);
+      if (Math.abs(err) < 1e-5) return yAt(t);
+      if (Math.abs(d) < 1e-6) break;
+      t -= err / d;
+    }
+    let lo = 0;
+    let hi = 1;
+    t = x;
+    for (let i = 0; i < 24; i++) {
+      if (xAt(t) < x) lo = t;
+      else hi = t;
+      t = (lo + hi) / 2;
+    }
+    return yAt(t);
+  };
+}
+
+/** Ease-in-out: both pieces gather speed softly out of rest, cross the
+ *  middle, and settle softly into place — on-screen movement, not an
+ *  entrance, so neither end should snap. Symmetric and moderate: a stronger
+ *  curve (0.77, 0, 0.175, 1) sits nearly still for the first quarter, then
+ *  whips through the middle at ~5x the average speed. */
+const slideEase = cubicBezier(0.65, 0, 0.35, 1);
+
+/** Corner close for a clicked playground piece: a white disc with a little
+ *  transparency, and a black X on top of it. */
+function CloseButton({ onClose }: { onClose: () => void }) {
+  return (
+    <button
+      type="button"
+      className="od-preview__close"
+      aria-label="Close"
+      onClick={(e) => {
+        e.stopPropagation();
+        onClose();
+      }}
+    >
+      <svg viewBox="0 0 16 16" width="14" height="14" fill="none" aria-hidden="true">
+        <path d="M3.5 3.5l9 9M12.5 3.5l-9 9" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" />
+      </svg>
+    </button>
+  );
+}
+
 /** The preview overlay. The artwork flies from its tile (`origin`) to the
  *  centre while the frost fades in on the same curve; the copy follows just
- *  behind. Closing flies it back into the tile before unmounting.
+ *  behind. Closing flies it back into the tile before unmounting. The corner
+ *  button, a click on the empty frost, and Escape all dismiss it.
  *
  *  The flight is WAAPI rather than a CSS transition: no reflow dance to make
  *  the start frame stick, and a close mid-open can pick up from wherever the
@@ -923,9 +1069,58 @@ function Preview({
       onClick={dismiss}
     >
       <div className="od-preview__backdrop" aria-hidden="true" />
+      <CloseButton onClose={dismiss} />
       <div className="od-preview__panel" onClick={(e) => e.stopPropagation()}>
         <div className={`od-preview__media${project.edgeBlur ? ' od-preview__media--edge-blur' : ''}`} ref={mediaRef}>
           <ProjectMedia media={project.media} variant="preview" />
+          {project.media.kind === 'video' && project.media.sound ? <SoundToggle host={mediaRef} /> : null}
+          {project.link ? <PrototypeLink href={project.link} frame /> : null}
+        </div>
+        <div className="od-preview__meta">
+          <div className="od-preview__head">
+            <span className="od-preview__title">{project.title}</span>
+            <span className="od-preview__year">{project.year}</span>
+          </div>
+          <p className="od-preview__desc">{project.description}</p>
+          {project.credits ? <p className="od-preview__credits">{project.credits}</p> : null}
+        </div>
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
+/** One piece at the size the zoom overlay used to open it to, with its write-up
+ *  underneath. Playback (flipbooks and clips) runs only while the slide is on
+ *  screen. */
+function Slide({ project }: { project: Project }) {
+  const ref = useRef<HTMLElement>(null);
+  const mediaRef = useRef<HTMLDivElement>(null);
+  const [live, setLive] = useState(false);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const io = new IntersectionObserver(([entry]) => setLive(entry.isIntersecting), { threshold: 0.35 });
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
+
+  useEffect(() => {
+    const videos = mediaRef.current?.querySelectorAll('video');
+    videos?.forEach((video) => {
+      if (live) void video.play().catch(() => {});
+      else video.pause();
+    });
+  }, [live]);
+
+  return (
+    <article className="od-slide" data-od-id={project.id} ref={ref} aria-label={project.title}>
+      {/* Scaled on its own so the article's box — what the row measures and
+          scrolls — stays full size while the piece itself grows and shrinks. */}
+      <div className="od-slide__body">
+        <div className={`od-preview__media${project.edgeBlur ? ' od-preview__media--edge-blur' : ''}`} ref={mediaRef}>
+          <ProjectMedia media={project.media} variant="preview" paused={!live} />
           {project.media.kind === 'video' && project.media.sound ? <SoundToggle host={mediaRef} /> : null}
         </div>
         <div className="od-preview__meta">
@@ -935,9 +1130,609 @@ function Preview({
           </div>
           <p className="od-preview__desc">{project.description}</p>
           {project.credits ? <p className="od-preview__credits">{project.credits}</p> : null}
-          {project.link ? (
-            <PrototypeLink href={project.link} />
-          ) : null}
+          {project.link ? <PrototypeLink href={project.link} /> : null}
+        </div>
+      </div>
+    </article>
+  );
+}
+
+/** The zoomed view for the grid. The clicked piece enlarges from its tile to
+ *  the centre, the same flight as a single preview. Neighbors sit fully off
+ *  screen. Scrolling to the next one slides the row with it: the open piece
+ *  travels off to the left as the next comes in, and back the other way when
+ *  scrolling to the previous. Closing flies the open piece home. The short
+ *  bar under it shows which project is open. */
+function GalleryPreview({
+  startId,
+  origin,
+  onHideTile,
+  onClose,
+}: {
+  startId: string;
+  origin: HTMLElement;
+  onHideTile: (id: string) => void;
+  onClose: () => void;
+}) {
+  const scrollerRef = useRef<HTMLDivElement>(null);
+  const sheetRef = useRef<HTMLDivElement>(null);
+  const trackRef = useRef<HTMLDivElement>(null);
+  const barRef = useRef<HTMLDivElement>(null);
+  const thumbRef = useRef<HTMLDivElement>(null);
+  const indexRef = useRef(Math.max(0, PROJECTS.findIndex((project) => project.id === startId)));
+  const layoutSig = useRef('');
+  const slideGen = useRef(0);
+  const slideFrame = useRef<number | null>(null);
+  const sliding = useRef(false);
+  const flightRef = useRef<Animation | null>(null);
+  const flew = useRef(false);
+  const landed = useRef(false);
+  const closingRef = useRef(false);
+  const onHideTileRef = useRef(onHideTile);
+  const onCloseRef = useRef(onClose);
+  const originRef = useRef(origin);
+  onHideTileRef.current = onHideTile;
+  onCloseRef.current = onClose;
+  originRef.current = origin;
+  const [open, setOpen] = useState(false);
+  const [closing, setClosing] = useState(false);
+  const [index, setIndex] = useState(indexRef.current);
+  const startProject = PROJECTS[Math.max(0, PROJECTS.findIndex((project) => project.id === startId))];
+  const openFillY = startProject.media.kind === 'video' ? (startProject.media.fill?.y ?? 0.5) : 0.5;
+
+  const slidesOf = useCallback(
+    () => [...(trackRef.current?.querySelectorAll<HTMLElement>('.od-slide') ?? [])],
+    [],
+  );
+
+  const centerLeft = useCallback((slide: HTMLElement) => {
+    const scroller = scrollerRef.current;
+    if (!scroller) return 0;
+    const view = scroller.getBoundingClientRect();
+    const box = slide.getBoundingClientRect();
+    return scroller.scrollLeft + (box.left + box.width / 2) - (view.left + view.width / 2);
+  }, []);
+
+  const nearestIndex = useCallback(() => {
+    const scroller = scrollerRef.current;
+    const slides = slidesOf();
+    if (!scroller || slides.length === 0) return 0;
+    const mid = scroller.getBoundingClientRect().left + scroller.clientWidth / 2;
+    let best = 0;
+    let bestDist = Infinity;
+    slides.forEach((slide, i) => {
+      const box = slide.getBoundingClientRect();
+      const dist = Math.abs(box.left + box.width / 2 - mid);
+      if (dist < bestDist) {
+        best = i;
+        bestDist = dist;
+      }
+    });
+    return best;
+  }, [slidesOf]);
+
+  const placeThumb = useCallback((i: number) => {
+    const bar = barRef.current;
+    const thumb = thumbRef.current;
+    if (!bar || !thumb) return;
+    const n = PROJECTS.length;
+    const thumbW = bar.clientWidth / n;
+    thumb.style.width = `${thumbW}px`;
+    thumb.style.transform = `translateX(${i * thumbW}px)`;
+    bar.setAttribute('aria-valuenow', String(i + 1));
+    bar.setAttribute('aria-valuemax', String(n));
+    bar.setAttribute('aria-valuetext', `${i + 1} of ${n}`);
+  }, []);
+
+  const applyMask = useCallback((i: number) => {
+    const scroller = scrollerRef.current;
+    const current = slidesOf()[i];
+    if (!scroller || !current) return;
+    // While the piece is still flying in or home, a mask would clip it off
+    // the tile. Neighbors are already past the screen edge.
+    if (!landed.current) {
+      scroller.style.maskImage = 'none';
+      scroller.style.setProperty('-webkit-mask-image', 'none');
+      return;
+    }
+    const view = scroller.getBoundingClientRect();
+    const box = current.getBoundingClientRect();
+    const a = Math.max(0, box.left - view.left);
+    const b = Math.min(view.width, box.right - view.left);
+    const mask = `linear-gradient(to right, transparent ${a}px, #000 ${a}px, #000 ${b}px, transparent ${b}px)`;
+    scroller.style.maskImage = mask;
+    scroller.style.setProperty('-webkit-mask-image', mask);
+  }, [slidesOf]);
+
+  const sync = useCallback(() => {
+    const i = nearestIndex();
+    indexRef.current = i;
+    setIndex(i);
+    placeThumb(i);
+    applyMask(i);
+  }, [nearestIndex, placeThumb, applyMask]);
+
+  const layout = useCallback((active: number) => {
+    const scroller = scrollerRef.current;
+    const track = trackRef.current;
+    const slides = slidesOf();
+    if (!scroller || !track || slides.length === 0) return false;
+    const view = scroller.clientWidth;
+    slides.forEach((slide) => slide.style.removeProperty('--od-slide-w'));
+    const widths = slides.map((slide) => slide.offsetWidth);
+    if (widths.some((width) => width < 80)) return false;
+    const sig = `${active}:${view}:${widths.join(',')}`;
+    if (sig === layoutSig.current) return false;
+    layoutSig.current = sig;
+    const current = widths[active] ?? 0;
+    // Neighbors start just past the screen edge, so nothing of them shows.
+    const hide = neighborGap(view, current);
+    slides.forEach((slide, i) => {
+      // Parked: only the open piece is visible, at full size. Neighbors wait
+      // at the entrance scale. The slide writes both itself, so a resize
+      // mid-slide must not snap them.
+      if (!sliding.current) {
+        slide.style.opacity = i === active ? '1' : '0';
+        const body = slide.querySelector<HTMLElement>('.od-slide__body');
+        if (body) body.style.transform = i === active ? '' : `scale(${SLIDE_SCALE})`;
+      }
+      if (i === slides.length - 1) {
+        slide.style.marginRight = '';
+        return;
+      }
+      const gap = i === active - 1 || i === active ? hide : view;
+      slide.style.marginRight = `${gap}px`;
+    });
+    track.style.paddingLeft = `${Math.max(0, (view - widths[0]) / 2)}px`;
+    track.style.paddingRight = `${Math.max(0, (view - widths[widths.length - 1]) / 2)}px`;
+    return true;
+  }, [slidesOf]);
+
+  const cancelSlide = useCallback(() => {
+    slideGen.current += 1;
+    if (slideFrame.current != null) cancelAnimationFrame(slideFrame.current);
+    slideFrame.current = null;
+    sliding.current = false;
+    // The slide rewrites margins outside layout(); drop the signature so the
+    // next park rebuilds them instead of trusting the mid-slide spacing.
+    layoutSig.current = '';
+  }, []);
+
+  const placeThumbAt = useCallback((position: number) => {
+    const bar = barRef.current;
+    const thumb = thumbRef.current;
+    if (!bar || !thumb) return;
+    const thumbW = bar.clientWidth / PROJECTS.length;
+    thumb.style.width = `${thumbW}px`;
+    thumb.style.transform = `translateX(${position * thumbW}px)`;
+  }, []);
+
+  /** Park `i` in the centre immediately. Used for the scrollbar, for a jump
+   *  of more than one project, and when motion is reduced. */
+  const jumpToIndex = useCallback(
+    (i: number) => {
+      const scroller = scrollerRef.current;
+      layout(i);
+      const slide = slidesOf()[i];
+      if (!scroller || !slide) return;
+      scroller.scrollTo({ left: Math.max(0, centerLeft(slide)), behavior: 'auto' });
+      indexRef.current = i;
+      setIndex(i);
+      placeThumb(i);
+      applyMask(i);
+    },
+    [layout, slidesOf, centerLeft, placeThumb, applyMask],
+  );
+
+  /** Slide from the open project to the next or previous one. The row moves
+   *  with the scroll: forward, the open piece travels left, fades out, and
+   *  shrinks while the next fades in and grows to full size as it reaches the
+   *  centre; backward, both travel the other way. The gap between them eases
+   *  from the outgoing width's off-screen spacing to the incoming one's, so a
+   *  wider or narrower piece doesn't pop at either end. */
+  const slideToIndex = useCallback(
+    (from: number, dest: number) => {
+      const scroller = scrollerRef.current;
+      const slides = slidesOf();
+      const fromSlide = slides[from];
+      const toSlide = slides[dest];
+      if (!scroller || !fromSlide || !toSlide) return false;
+      const view = scroller.clientWidth;
+      const fromW = fromSlide.offsetWidth;
+      const toW = toSlide.offsetWidth;
+      if (view < 80 || fromW < 80 || toW < 80) return false;
+
+      const hide = (width: number) => neighborGap(view, width);
+      const forward = dest > from;
+      const fromX0 = view / 2;
+      const toX1 = view / 2;
+      const fromX1 = forward
+        ? view / 2 - toW / 2 - hide(toW) - fromW / 2
+        : view / 2 + toW / 2 + hide(toW) + fromW / 2;
+      const toX0 = forward
+        ? view / 2 + fromW / 2 + hide(fromW) + toW / 2
+        : view / 2 - fromW / 2 - hide(fromW) - toW / 2;
+      const leftSlide = slides[Math.min(from, dest)];
+      const gen = (slideGen.current += 1);
+
+      const bodyOf = (slide: HTMLElement) => slide.querySelector<HTMLElement>('.od-slide__body');
+      const paintScale = (slide: HTMLElement, scale: number) => {
+        const body = bodyOf(slide);
+        if (body) body.style.transform = scale === 1 ? '' : `scale(${scale})`;
+      };
+
+      sliding.current = true;
+      indexRef.current = dest;
+      fromSlide.style.opacity = '1';
+      toSlide.style.opacity = '0';
+      paintScale(fromSlide, 1);
+      paintScale(toSlide, SLIDE_SCALE);
+      scroller.style.maskImage = 'none';
+      scroller.style.setProperty('-webkit-mask-image', 'none');
+
+      const contentLeft = (slide: HTMLElement) => {
+        const viewBox = scroller.getBoundingClientRect();
+        const box = slide.getBoundingClientRect();
+        return scroller.scrollLeft + (box.left - viewBox.left);
+      };
+
+      const finish = () => {
+        if (slideGen.current !== gen) return;
+        slideFrame.current = null;
+        // layout() leaves opacities alone while a slide is running, so park
+        // them here: the one that arrived is solid, everything else is gone.
+        sliding.current = false;
+        layout(dest);
+        const parked = slidesOf();
+        parked.forEach((slide, i) => {
+          const here = i === dest;
+          slide.style.opacity = here ? '1' : '0';
+          const body = slide.querySelector<HTMLElement>('.od-slide__body');
+          if (body) body.style.transform = here ? '' : `scale(${SLIDE_SCALE})`;
+        });
+        const slide = parked[dest];
+        if (slide) scroller.scrollLeft = Math.max(0, centerLeft(slide));
+        indexRef.current = dest;
+        setIndex(dest);
+        placeThumb(dest);
+        applyMask(dest);
+      };
+
+      const started = performance.now();
+      const step = (now: number) => {
+        if (slideGen.current !== gen) return;
+        const raw = Math.min(1, (now - started) / SLIDE_MS);
+        if (raw >= 1) {
+          finish();
+          return;
+        }
+        const e = slideEase(raw);
+        const fromX = fromX0 + (fromX1 - fromX0) * e;
+        const toX = toX0 + (toX1 - toX0) * e;
+        const gap = Math.abs(toX - fromX) - fromW / 2 - toW / 2;
+        leftSlide.style.marginRight = `${Math.max(0, gap)}px`;
+        fromSlide.style.opacity = String(1 - e);
+        toSlide.style.opacity = String(e);
+        paintScale(fromSlide, 1 - (1 - SLIDE_SCALE) * e);
+        paintScale(toSlide, SLIDE_SCALE + (1 - SLIDE_SCALE) * e);
+        scroller.scrollLeft = Math.max(0, contentLeft(fromSlide) + fromW / 2 - fromX);
+        placeThumbAt(from + (dest - from) * e);
+        slideFrame.current = requestAnimationFrame(step);
+      };
+      slideFrame.current = requestAnimationFrame(step);
+      return true;
+    },
+    [layout, slidesOf, centerLeft, placeThumb, placeThumbAt, applyMask],
+  );
+
+  const scrollToIndex = useCallback(
+    (i: number, behavior: 'slide' | 'jump' = 'slide') => {
+      if (!landed.current || closingRef.current) return;
+      const dest = Math.max(0, Math.min(PROJECTS.length - 1, i));
+      if (behavior === 'jump') {
+        if (sliding.current) cancelSlide();
+      } else if (sliding.current) return;
+      const from = indexRef.current;
+      if (
+        behavior === 'slide' &&
+        dest !== from &&
+        Math.abs(dest - from) === 1 &&
+        !reducedMotion() &&
+        slideToIndex(from, dest)
+      ) {
+        return;
+      }
+      jumpToIndex(dest);
+    },
+    [cancelSlide, jumpToIndex, slideToIndex],
+  );
+
+  const unclip = useCallback(() => {
+    const scroller = scrollerRef.current;
+    const sheet = sheetRef.current;
+    // The piece has to travel from a tile that may sit outside the row's box.
+    if (scroller) scroller.style.overflow = 'visible';
+    if (sheet) sheet.style.overflow = 'visible';
+  }, []);
+
+  const reclip = useCallback(() => {
+    const scroller = scrollerRef.current;
+    scroller?.style.removeProperty('overflow');
+    sheetRef.current?.style.removeProperty('overflow');
+    landed.current = true;
+    // Scrolling is a no-op while unclipped, so any re-centre during the
+    // flight was dropped; catch up now that the row can scroll again.
+    const slide = slidesOf()[indexRef.current];
+    if (scroller && slide) scroller.scrollLeft = Math.max(0, centerLeft(slide));
+    applyMask(indexRef.current);
+  }, [applyMask, slidesOf, centerLeft]);
+
+  useLayoutEffect(() => {
+    let cleaned = false;
+    let removeReady: (() => void) | undefined;
+
+    const settle = () => {
+      // Margin changes during a slide resize the track. Leave that animation
+      // alone; it parks itself when it finishes.
+      if (sliding.current || closingRef.current) return;
+      const i = indexRef.current;
+      if (!layout(i)) return;
+      const scroller = scrollerRef.current;
+      const slide = slidesOf()[i];
+      if (!scroller || !slide) return;
+      scroller.scrollTo({ left: Math.max(0, centerLeft(slide)), behavior: 'auto' });
+      // The open project is already known; reading it back from the scroll
+      // position would report the first one while the row is unclipped.
+      setIndex(i);
+      placeThumb(i);
+      applyMask(i);
+    };
+
+    const tryLaunch = () => {
+      if (cleaned || flew.current) return;
+      const media = slidesOf()[indexRef.current]?.querySelector<HTMLElement>('.od-preview__media');
+      if (!media) return;
+      const art = media.querySelector<HTMLElement>('img, video');
+      const ready =
+        art instanceof HTMLVideoElement
+          ? art.readyState >= HTMLMediaElement.HAVE_METADATA
+          : art instanceof HTMLImageElement
+            ? art.complete && art.naturalWidth > 0
+            : true;
+      if (!(ready && media.getBoundingClientRect().width > 0)) {
+        media.style.visibility = 'hidden';
+        if (!removeReady && art) {
+          const readyEvent = art instanceof HTMLVideoElement ? 'loadedmetadata' : 'load';
+          const onReady = () => tryLaunch();
+          art.addEventListener(readyEvent, onReady, { once: true });
+          removeReady = () => art.removeEventListener(readyEvent, onReady);
+        }
+        return;
+      }
+      flew.current = true;
+      media.style.visibility = '';
+      settle();
+      const rest = restingBox(media);
+      const originClip = clipOf(originRef.current);
+      if (art instanceof HTMLVideoElement && originClip) art.currentTime = originClip.currentTime;
+      if (!reducedMotion() && rest.width > 0) {
+        const tile = originRef.current.getBoundingClientRect();
+        unclip();
+        flightRef.current?.cancel();
+        const flight = media.animate(
+          [
+            { transform: flipTransform(tile, rest, openFillY), clipPath: tileCrop(tile, rest, openFillY) },
+            { transform: 'none', clipPath: NO_CROP },
+          ],
+          { duration: FLIGHT_IN_MS, easing: FLIGHT_EASE },
+        );
+        flightRef.current = flight;
+        flight.onfinish = () => {
+          if (cleaned || closingRef.current) return;
+          flightRef.current = null;
+          reclip();
+        };
+      } else {
+        reclip();
+      }
+      onHideTileRef.current(startId);
+      setOpen(true);
+    };
+
+    settle();
+    tryLaunch();
+    const fallback = window.setTimeout(tryLaunch, 600);
+    const scroller = scrollerRef.current;
+    const track = trackRef.current;
+    const ro = new ResizeObserver(() => {
+      settle();
+      tryLaunch();
+    });
+    if (scroller) ro.observe(scroller);
+    if (track) ro.observe(track);
+    return () => {
+      cleaned = true;
+      removeReady?.();
+      window.clearTimeout(fallback);
+      flightRef.current?.cancel();
+      flightRef.current = null;
+      if (!landed.current) flew.current = false;
+      slideGen.current += 1;
+      if (slideFrame.current != null) cancelAnimationFrame(slideFrame.current);
+      slideFrame.current = null;
+      sliding.current = false;
+      ro.disconnect();
+    };
+  }, [layout, slidesOf, centerLeft, placeThumb, applyMask, unclip, reclip, openFillY, startId]);
+
+  const dismiss = useCallback(() => {
+    if (closingRef.current) return;
+    closingRef.current = true;
+    cancelSlide();
+    const media = slidesOf()[indexRef.current]?.querySelector<HTMLElement>('.od-preview__media') ?? null;
+    const project = PROJECTS[indexRef.current];
+    const tileButton = project ? document.querySelector<HTMLElement>(`[data-od-tile="${project.id}"]`) : null;
+    const tileArt = tileButton?.querySelector<HTMLElement>('.device-ipad, canvas, img, video') ?? tileButton;
+    if (!media || !tileArt || reducedMotion()) {
+      onCloseRef.current();
+      return;
+    }
+    setClosing(true);
+    setOpen(false);
+    onHideTileRef.current(project.id);
+    unclip();
+    landed.current = false;
+    const from = getComputedStyle(media).transform;
+    const fromClip = getComputedStyle(media).clipPath;
+    flightRef.current?.cancel();
+    const y = project.media.kind === 'video' ? (project.media.fill?.y ?? 0.5) : 0.5;
+    const tile = tileArt.getBoundingClientRect();
+    const rest = restingBox(media);
+    const clip = media.querySelector('video');
+    const homeClip = clipOf(tileArt);
+    if (clip && homeClip) homeClip.currentTime = clip.currentTime;
+    const back = media.animate(
+      [
+        { transform: from === 'none' ? 'none' : from, clipPath: fromClip === 'none' ? NO_CROP : fromClip },
+        { transform: flipTransform(tile, rest, y), clipPath: tileCrop(tile, rest, y) },
+      ],
+      { duration: FLIGHT_OUT_MS, easing: FLIGHT_EASE, fill: 'forwards' },
+    );
+    flightRef.current = back;
+    back.onfinish = () => onCloseRef.current();
+  }, [cancelSlide, slidesOf, unclip]);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') dismiss();
+      else if (e.key === 'ArrowRight') scrollToIndex(Math.min(PROJECTS.length - 1, indexRef.current + 1));
+      else if (e.key === 'ArrowLeft') scrollToIndex(Math.max(0, indexRef.current - 1));
+      else if (e.key === 'Home') scrollToIndex(0, 'jump');
+      else if (e.key === 'End') scrollToIndex(PROJECTS.length - 1, 'jump');
+    };
+    window.addEventListener('keydown', onKey);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    const scroller = scrollerRef.current;
+    const sheet = sheetRef.current;
+    // A trackpad swipe keeps emitting momentum wheel events well after the
+    // slide finishes; the lock holds until the stream goes quiet so one
+    // gesture only ever moves one item.
+    let wheelLock = false;
+    let quietTimer = 0;
+    const holdUntilQuiet = () => {
+      window.clearTimeout(quietTimer);
+      quietTimer = window.setTimeout(() => {
+        if (sliding.current) holdUntilQuiet();
+        else wheelLock = false;
+      }, WHEEL_QUIET_MS);
+    };
+    const onScroll = () => {
+      // While the piece flies in (or home) the row is unclipped, which drops
+      // its scroll offset to 0. Reading the open project back from that would
+      // pick the first one and park the clicked piece off screen.
+      if (sliding.current || !landed.current || closingRef.current) return;
+      sync();
+    };
+    scroller?.addEventListener('scroll', onScroll, { passive: true });
+    const onWheel = (e: WheelEvent) => {
+      if (!scroller) return;
+      const delta = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
+      if (delta === 0) return;
+      e.preventDefault();
+      if (wheelLock) {
+        holdUntilQuiet();
+        return;
+      }
+      if (sliding.current || !landed.current || closingRef.current) return;
+      const dir = delta > 0 ? 1 : -1;
+      const next = Math.min(PROJECTS.length - 1, Math.max(0, indexRef.current + dir));
+      wheelLock = true;
+      holdUntilQuiet();
+      if (next !== indexRef.current) scrollToIndex(next);
+    };
+    sheet?.addEventListener('wheel', onWheel, { passive: false });
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      document.body.style.overflow = prev;
+      scroller?.removeEventListener('scroll', onScroll);
+      sheet?.removeEventListener('wheel', onWheel);
+      window.clearTimeout(quietTimer);
+    };
+  }, [dismiss, scrollToIndex, sync]);
+
+  const onBarPointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
+    const bar = barRef.current;
+    const thumb = thumbRef.current;
+    if (!bar || !thumb) return;
+    e.stopPropagation();
+    const indexAt = (clientX: number) => {
+      const rect = bar.getBoundingClientRect();
+      const thumbW = thumb.getBoundingClientRect().width || rect.width / PROJECTS.length;
+      const span = Math.max(1, rect.width - thumbW);
+      const ratio = (clientX - rect.left - thumbW / 2) / span;
+      return Math.min(PROJECTS.length - 1, Math.max(0, Math.round(ratio * (PROJECTS.length - 1))));
+    };
+    const jump = (clientX: number) => scrollToIndex(indexAt(clientX), 'jump');
+    jump(e.clientX);
+    e.currentTarget.setPointerCapture(e.pointerId);
+    const move = (ev: PointerEvent) => jump(ev.clientX);
+    const up = () => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+    bar.focus();
+  };
+
+  return createPortal(
+    <div
+      className={`od-preview od-zoom${open ? ' is-open' : ''}${closing ? ' is-closing' : ''}`}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Other mediums of design"
+      onClick={dismiss}
+    >
+      <div className="od-preview__backdrop" aria-hidden="true" />
+      <CloseButton onClose={dismiss} />
+      <div className="od-zoom__sheet" ref={sheetRef}>
+        <div
+          className="od-rail__scroller"
+          id="other-designs-scroller"
+          ref={scrollerRef}
+          onClick={(e) => {
+            // The row is full-bleed, and the off-screen neighbors are only
+            // hidden by a mask, so a click beside the piece still lands in
+            // here. Keep the open piece (and its controls); let the rest
+            // bubble up and close, the same as the empty frost.
+            const current = slidesOf()[indexRef.current];
+            if (current?.contains(e.target as Node)) e.stopPropagation();
+          }}
+        >
+          <div className="od-rail__track" ref={trackRef}>
+            {PROJECTS.map((project) => (
+              <Slide key={project.id} project={project} />
+            ))}
+          </div>
+        </div>
+        <div className="od-zoom__progress" onClick={(e) => e.stopPropagation()}>
+          <div
+            className="od-rail__bar"
+            ref={barRef}
+            role="scrollbar"
+            aria-controls="other-designs-scroller"
+            aria-orientation="horizontal"
+            aria-valuemin={1}
+            aria-valuemax={PROJECTS.length}
+            aria-valuenow={index + 1}
+            aria-valuetext={`${index + 1} of ${PROJECTS.length}`}
+            aria-label="Project position"
+            tabIndex={0}
+            onPointerDown={onBarPointerDown}
+          >
+            <div className="od-rail__thumb" ref={thumbRef} />
+          </div>
         </div>
       </div>
     </div>,
@@ -946,28 +1741,16 @@ function Preview({
 }
 
 export default function OtherDesigns() {
-  const [active, setActive] = useState<{ project: Project; origin: HTMLElement } | null>(null);
-  // Set once the preview's artwork has actually taken off, so the tile never
-  // goes blank while the preview copy is still waiting to be measured.
-  const [flown, setFlown] = useState(false);
+  const [active, setActive] = useState<{ id: string; origin: HTMLElement } | null>(null);
+  const [hiddenId, setHiddenId] = useState<string | null>(null);
   const [canPortal, setCanPortal] = useState(false);
   useEffect(() => setCanPortal(true), []);
-
-  const launch = useCallback(() => setFlown(true), []);
-  const close = useCallback(() => {
-    setActive(null);
-    setFlown(false);
-  }, []);
 
   return (
     <section className="other-designs" aria-label="Other mediums of design I explored with">
       <h2 className="other-designs__title">{'Other mediums of design I explored with...'}</h2>
       <div
         className="other-designs__grid"
-        // "Warm" once the cursor has left a first tile without leaving the
-        // grid: from then on, tile-to-tile hovers skip the slow entrance (see
-        // .other-designs__grid[data-warm] in globals.css). A DOM attribute, not
-        // state, so hovering never re-renders the tiles.
         onPointerOut={(e) => {
           const tile = (e.target as Element).closest('.other-design');
           if (tile && !tile.contains(e.relatedTarget as Node | null)) e.currentTarget.dataset.warm = '';
@@ -976,21 +1759,26 @@ export default function OtherDesigns() {
           delete e.currentTarget.dataset.warm;
         }}
       >
-        {PROJECTS.map((project) => {
-          const isActive = active?.project.id === project.id;
-          return (
-            <Tile
-              key={project.id}
-              project={project}
-              active={isActive}
-              flown={isActive && flown}
-              onOpen={(origin) => setActive({ project, origin })}
-            />
-          );
-        })}
+        {PROJECTS.map((project) => (
+          <Tile
+            key={project.id}
+            project={project}
+            active={active?.id === project.id}
+            flown={hiddenId === project.id}
+            onOpen={(origin) => setActive({ id: project.id, origin })}
+          />
+        ))}
       </div>
       {canPortal && active ? (
-        <Preview project={active.project} origin={active.origin} onLaunch={launch} onClose={close} />
+        <GalleryPreview
+          startId={active.id}
+          origin={active.origin}
+          onHideTile={setHiddenId}
+          onClose={() => {
+            setActive(null);
+            setHiddenId(null);
+          }}
+        />
       ) : null}
     </section>
   );
@@ -1047,4 +1835,14 @@ function SoloProject({
  *  row in VibeCoding). */
 export function PinchPrototype() {
   return <SoloProject project={PINCH} className="other-design--slot" pillLabel="View more" />;
+}
+
+/** The language-feedback prototype, the same way as Pinch. */
+export function LanguagePrototype() {
+  return <SoloProject project={LANGUAGE} className="other-design--slot" pillLabel="View more" />;
+}
+
+/** The animated text bubbles prototype, the same way as Pinch. */
+export function TextingPrototype() {
+  return <SoloProject project={TEXTING} className="other-design--slot" pillLabel="View more" />;
 }

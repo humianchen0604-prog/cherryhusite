@@ -1,12 +1,13 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { toast } from 'sonner';
 import { CursorFollowPill, placePill } from '@/components/casestudy/CursorFollowPill';
 import { FeatherIcon, type FeatherIconHandle } from '@/components/icons/FeatherIcon';
 import { DOTS_PLAY_EVENT, type DotsPlayDetail } from '@/components/GuestbookDotField';
 import { playBook, playPageTurn } from '@/lib/sfx';
+import { setGuestbookOpen } from '@/lib/guestbookOpen';
 
 /**
  * The guestbook in the footer's book slot.
@@ -23,7 +24,7 @@ import { playBook, playPageTurn } from '@/lib/sfx';
  * and tells the book when it is docked.
  */
 
-const BOOK_SRC = '/guestbook/book-cover.html';
+const BOOK_SRC = '/guestbook/book-cover.html?v=20261012-kb-default2';
 const MSG = 'guestbook-book';
 const FIRST_PAGE_TOAST_ID = 'guestbook-edge-page';
 const FIRST_PAGE_TOAST_MS = 1200;
@@ -55,15 +56,30 @@ function replayToastEnter() {
 export default function GuestbookBook() {
   const [open, setOpen] = useState(false);
   const [ready, setReady] = useState(false);
-  const [dockAt, setDockAt] = useState<Rect | null>(null);
   // True while the book is travelling from centre back into the slot.
   const [settling, setSettling] = useState(false);
   // createPortal needs a real document; the page is prerendered on the server.
   const [canPortal, setCanPortal] = useState(false);
+  const openRef = useRef(open);
+  openRef.current = open;
+  const settlingRef = useRef(settling);
+  settlingRef.current = settling;
   useEffect(() => setCanPortal(true), []);
+  // Tell the page behind (the camera reel's looping wall) to hold still.
+  useEffect(() => {
+    setGuestbookOpen(open);
+  }, [open]);
+  useEffect(() => () => setGuestbookOpen(false), []);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const slotRef = useRef<HTMLDivElement>(null);
   const sawOpen = useRef(false);
+  const pinAnimRef = useRef<Animation | null>(null);
+  const localRef = useRef<Rect | null>(null);
+  const sigRef = useRef('');
+  /** Set while the cover flip owns the frame, so scroll pinning stays off. */
+  const holdRef = useRef(false);
+  const placeRef = useRef<(force?: boolean) => void>(() => {});
+  const fallbackStopRef = useRef<(() => void) | null>(null);
   // "Sign" pill. The book lives in an iframe, so the frame reports
   // hover + cursor position and the host draws the pill.
   const pillRef = useRef<HTMLDivElement>(null);
@@ -79,13 +95,10 @@ export default function GuestbookBook() {
     iframeRef.current?.contentWindow?.postMessage({ source: MSG, ...msg }, '*');
   }, []);
 
-  /** Correct scale/centre against the book's settled box. */
+  /** Re-measure the closed book onto its pin. Safe to call after the close flight. */
   const refit = useCallback(() => {
-    const el = slotRef.current;
-    if (!el) return;
-    const r = el.getBoundingClientRect();
-    send({ type: 'refit', left: r.left, top: r.top, width: r.width, height: r.height });
-  }, [send]);
+    placeRef.current(true);
+  }, []);
 
   const dock = useCallback(() => {
     const el = slotRef.current;
@@ -115,60 +128,227 @@ export default function GuestbookBook() {
     setSettling(true);
     dock();
     window.setTimeout(() => {
+      settlingRef.current = false;
       setSettling(false);
       refit();
-    }, SHRINK_MS + 60);
+    }, SHRINK_MS + 120);
   }, [dock, refit]);
 
   /*
-   * Follow the slot every frame while docked. Scroll/resize listeners are not
-   * enough: the footer's reveal transform is driven by React state and settles
-   * *after* the last scroll event, so a listener-based measure leaves the book
-   * adrift. One rect read per frame is cheap.
+   * Keep the closed book on the footer slot.
+   *
+   * The slot lives in the page, but the book is a fixed iframe. Updating its
+   * position from a scroll listener lands a frame late, and the docked stage
+   * also eases for 480ms, so a fast flick leaves the cover gliding upward
+   * after the footer has already arrived. A scroll timeline moves the iframe
+   * on the compositor, in the same frame as the page.
+   *
+   * The stage stays parked in the middle of the iframe (fully inside it, so
+   * nothing is clipped) and the iframe's own translation supplies the rest.
    */
-  useEffect(() => {
-    if (open || settling) return;
-    let frame = 0;
-    let last = '';
-    // The loop restarts after every open/close, so the first tick would re-send
-    // a dock for a slot that has not actually moved. Re-docking re-measures,
-    // which restarts the shrink transition and makes the book wobble as it
-    // lands. Seed the key instead; the initial dock comes from onLoad/ready.
-    let seeded = false;
-    const tick = () => {
-      const el = slotRef.current;
-      if (el) {
-        const r = el.getBoundingClientRect();
-        const key = `${Math.round(r.left)}:${Math.round(r.top)}:${Math.round(r.width)}`;
-        if (key !== last) {
-          last = key;
-          setDockAt({ left: r.left, top: r.top, width: r.width, height: r.height });
-          // Scroll tracking: snap. Easing each frame's new target made the
-          // book lag and slide behind its slot all the way down the page.
-          if (seeded) send({ type: 'dock', animate: false, left: r.left, top: r.top, width: r.width, height: r.height });
-          seeded = true;
-        }
-      }
-      frame = requestAnimationFrame(tick);
+  useLayoutEffect(() => {
+    const frame = iframeRef.current;
+    const slot = slotRef.current;
+    const host = window as Window & { __guestbookReleasePin?: () => void };
+
+    const stopPin = () => {
+      pinAnimRef.current?.cancel();
+      pinAnimRef.current = null;
+      fallbackStopRef.current?.();
+      fallbackStopRef.current = null;
+      if (frame) frame.style.transform = '';
     };
-    frame = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(frame);
-  }, [open, settling, send]);
+
+    host.__guestbookReleasePin = () => {
+      holdRef.current = true;
+      sigRef.current = '';
+      localRef.current = null;
+      stopPin();
+      if (!frame?.contentWindow) return;
+      frame.style.clipPath = '';
+      frame.contentWindow.dispatchEvent(new MessageEvent('message', {
+        data: { source: MSG, type: 'undock' },
+      }));
+    };
+
+    const dropHost = () => {
+      if (host.__guestbookReleasePin) delete host.__guestbookReleasePin;
+    };
+
+    if (open || settling || !ready || !frame || !slot) {
+      if (open || settling) stopPin();
+      return dropHost;
+    }
+
+    holdRef.current = false;
+
+    const clipFor = (r: Rect) =>
+      `inset(${Math.max(0, r.top - PAD_TOP)}px ` +
+      `${Math.max(0, window.innerWidth - (r.left + r.width) - PAD_X)}px ` +
+      `${Math.max(0, window.innerHeight - (r.top + r.height) - PAD_BOTTOM)}px ` +
+      `${Math.max(0, r.left - PAD_X)}px)`;
+
+    const deliver = (msg: Record<string, unknown>) => {
+      frame.contentWindow?.dispatchEvent(new MessageEvent('message', {
+        data: { source: MSG, ...msg },
+      }));
+    };
+
+    const snapStage = () => {
+      const stage = frame.contentDocument?.getElementById('stage');
+      if (stage) stage.style.transition = 'none';
+    };
+
+    const startPin = (pinBase: number, max: number) => {
+      const Ctor = (window as unknown as {
+        ScrollTimeline?: new (opts: { source: Element; axis: 'block' }) => AnimationTimeline;
+      }).ScrollTimeline;
+      if (!Ctor) return false;
+      const source = document.scrollingElement || document.documentElement;
+      try {
+        pinAnimRef.current = frame.animate(
+          [
+            { transform: `translate3d(0px, ${pinBase.toFixed(2)}px, 0px)` },
+            { transform: `translate3d(0px, ${(pinBase - max).toFixed(2)}px, 0px)` },
+          ],
+          {
+            fill: 'both',
+            easing: 'linear',
+            timeline: new Ctor({ source, axis: 'block' }),
+          } as KeyframeAnimationOptions,
+        );
+        return true;
+      } catch {
+        pinAnimRef.current = null;
+        return false;
+      }
+    };
+
+    const startFallback = () => {
+      let lastTop = Number.NaN;
+      let lastLeft = Number.NaN;
+      const follow = () => {
+        const doc = frame.contentDocument;
+        const root = doc?.documentElement.style;
+        const stage = doc?.getElementById('stage');
+        const body = doc?.body;
+        if (!root || !stage || !body?.classList.contains('is-docked')) return;
+        if (stage.style.transform) return;
+        stage.style.transition = 'none';
+        const r = slot.getBoundingClientRect();
+        frame.style.clipPath = clipFor(r);
+        if (Number.isNaN(lastTop)) {
+          lastTop = r.top;
+          lastLeft = r.left;
+          return;
+        }
+        const dy = r.top - lastTop;
+        const dx = r.left - lastLeft;
+        if (dy === 0 && dx === 0) return;
+        const ty = parseFloat(root.getPropertyValue('--dock-ty')) || 0;
+        const tx = parseFloat(root.getPropertyValue('--dock-tx')) || 0;
+        if (dy) root.setProperty('--dock-ty', `${(ty + dy).toFixed(2)}px`);
+        if (dx) root.setProperty('--dock-tx', `${(tx + dx).toFixed(2)}px`);
+        lastTop = r.top;
+        lastLeft = r.left;
+      };
+      follow();
+      window.addEventListener('scroll', follow, { passive: true });
+      fallbackStopRef.current = () => window.removeEventListener('scroll', follow);
+    };
+
+    const place = (force = false) => {
+      if (holdRef.current || openRef.current || settlingRef.current) return;
+      if (!frame.contentWindow) return;
+      const r = slot.getBoundingClientRect();
+      if (r.width < 1 || r.height < 1) return;
+      const scroller = document.scrollingElement || document.documentElement;
+      const max = Math.max(1, scroller.scrollHeight - scroller.clientHeight);
+      const docTop = r.top + window.scrollY;
+      const sig = [
+        Math.round(r.left), Math.round(r.width), Math.round(r.height),
+        Math.round(docTop), Math.round(max), window.innerHeight,
+      ].join(':');
+      if (!force && sig === sigRef.current) return;
+
+      const localTop = Math.max(0, (window.innerHeight - r.height) / 2);
+      const local: Rect = { left: r.left, top: localTop, width: r.width, height: r.height };
+      const pinBase = docTop - localTop;
+      // Hidden only for the measure. A scroll-timeline animation created while
+      // an inline transform is set stays pending and never picks up the scroll,
+      // so the cover sits still and the next flick leaves it behind. Clear that
+      // inline transform before starting the timeline, and uncover on the next
+      // frame once the timeline has resolved.
+      const prevVis = frame.style.visibility;
+      frame.style.visibility = 'hidden';
+      try {
+        stopPin();
+        frame.style.transform = 'none';
+        deliver({ type: 'dock', animate: false, ...local });
+        deliver({ type: 'refit', ...local });
+        snapStage();
+        frame.style.transform = '';
+        const pinned = startPin(pinBase, max);
+        if (pinned) {
+          localRef.current = local;
+          frame.style.clipPath = clipFor(local);
+        } else {
+          localRef.current = null;
+          deliver({
+            type: 'dock', animate: false,
+            left: r.left, top: r.top, width: r.width, height: r.height,
+          });
+          deliver({ type: 'refit', left: r.left, top: r.top, width: r.width, height: r.height });
+          snapStage();
+          frame.style.clipPath = clipFor(r);
+          startFallback();
+        }
+        sigRef.current = sig;
+      } finally {
+        requestAnimationFrame(() => {
+          if (frame.style.visibility === 'hidden') frame.style.visibility = prevVis;
+        });
+      }
+    };
+
+    placeRef.current = () => place(true);
+    place(true);
+    const onResize = () => place(false);
+    window.addEventListener('resize', onResize);
+    const ro = new ResizeObserver(onResize);
+    ro.observe(document.documentElement);
+    return () => {
+      dropHost();
+      window.removeEventListener('resize', onResize);
+      ro.disconnect();
+      stopPin();
+      placeRef.current = () => {};
+    };
+  }, [open, settling, ready]);
 
   useEffect(() => {
     const onMessage = (e: MessageEvent) => {
       const d = e.data;
       if (!d || d.source !== MSG) return;
-      if (d.type === 'ready') { setReady(true); dock(); }
+      if (d.type === 'ready') setReady(true);
       // Clicking the docked book asks for room before its flip runs.
-      if (d.type === 'requestOpen') { playBook('open'); setOpen(true); send({ type: 'undock' }); }
+      if (d.type === 'requestOpen') {
+        const host = window as Window & { __guestbookReleasePin?: () => void };
+        host.__guestbookReleasePin?.();
+        playBook('open');
+        setOpen(true);
+        send({ type: 'undock' });
+      }
       if (d.type === 'hoverStart' || d.type === 'hoverMove') {
         if (
           !window.matchMedia('(hover: hover) and (pointer: fine)').matches ||
           window.matchMedia('(prefers-reduced-motion: reduce)').matches
         ) return;
         if (pillRef.current) {
-          placePill(pillRef.current, d.x, d.y);
+          // Coords are iframe-local. With the frame pinned they are not the
+          // page's viewport coords unless the frame's own origin is added back.
+          const fr = iframeRef.current?.getBoundingClientRect();
+          placePill(pillRef.current, d.x + (fr?.left || 0), d.y + (fr?.top || 0));
         }
         if (d.type === 'hoverStart') setPillOn(true);
       }
@@ -204,14 +384,12 @@ export default function GuestbookBook() {
     };
     window.addEventListener('message', onMessage);
     return () => window.removeEventListener('message', onMessage);
-  }, [dock, send, goHome, refit]);
+  }, [send, goHome, refit]);
 
   // The book's hover peek moves in step with the footer's dot shapes: it opens
   // while they form, holds while they hold, and closes as they return to dots.
   // Each composition announces its own timing (its length varies with how many
   // shapes it has), so the two never drift apart.
-  const openRef = useRef(open);
-  openRef.current = open;
   useEffect(() => {
     let peekTimers: number[] = [];
 
@@ -240,24 +418,101 @@ export default function GuestbookBook() {
     return () => window.removeEventListener('scroll', hide, true);
   }, []);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         close();
         return;
       }
-      if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
-      // Typing lives in the iframe; parent only forwards when it has focus.
-      e.preventDefault();
-      send({ type: 'keyFlip', dir: e.key === 'ArrowLeft' ? 'prev' : 'next' });
+      if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+        // Typing lives in the iframe; parent only forwards when it has focus.
+        e.preventDefault();
+        send({ type: 'keyFlip', dir: e.key === 'ArrowLeft' ? 'prev' : 'next' });
+        return;
+      }
+      // Space, page keys, and the vertical arrows would scroll the page behind the book.
+      if (e.key === ' ' || e.key === 'PageUp' || e.key === 'PageDown' || e.key === 'Home' || e.key === 'End' || e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+        const target = e.target as HTMLElement | null;
+        if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) return;
+        e.preventDefault();
+      }
     };
     window.addEventListener('keydown', onKey);
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
+
+    // The document (html) is the scroller, not body, so hiding body overflow
+    // never stopped the page. Pinning the body keeps the backdrop exactly
+    // where it was. The footer text is a scroll-driven animation, so freeze
+    // its painted frame first — otherwise the lock resets that timeline and
+    // the blur behind the book jumps.
+    const scrollY = window.scrollY;
+    const html = document.documentElement;
+    const body = document.body;
+    const reveal = document.querySelector<HTMLElement>('.footer_reveal-image');
+    if (reveal) {
+      const paintedTransform = getComputedStyle(reveal).transform;
+      const paintedOpacity = getComputedStyle(reveal).opacity;
+      reveal.style.animation = 'none';
+      reveal.style.transform = paintedTransform;
+      reveal.style.opacity = paintedOpacity;
+    }
+    const gap = window.innerWidth - html.clientWidth;
+    const prev = {
+      htmlOverflow: html.style.overflow,
+      bodyOverflow: body.style.overflow,
+      position: body.style.position,
+      top: body.style.top,
+      left: body.style.left,
+      right: body.style.right,
+      width: body.style.width,
+      paddingRight: body.style.paddingRight,
+    };
+    // Fix the body before touching overflow. Hiding overflow on the root
+    // first changes the scrollport, and the backdrop then jumps.
+    body.style.position = 'fixed';
+    body.style.top = `-${scrollY}px`;
+    body.style.left = '0';
+    body.style.right = '0';
+    body.style.width = '100%';
+    if (gap > 0) body.style.paddingRight = `${gap}px`;
+    html.style.overflow = 'hidden';
+    body.style.overflow = 'hidden';
+
+    const stopScroll = (e: Event) => e.preventDefault();
+    window.addEventListener('wheel', stopScroll, { passive: false });
+    window.addEventListener('touchmove', stopScroll, { passive: false });
+    const frameDoc = iframeRef.current?.contentDocument;
+    const frameHtml = frameDoc?.documentElement;
+    const frameBody = frameDoc?.body;
+    const frameOverflow = frameHtml?.style.overflow ?? '';
+    const frameBodyOverflow = frameBody?.style.overflow ?? '';
+    if (frameHtml) frameHtml.style.overflow = 'hidden';
+    if (frameBody) frameBody.style.overflow = 'hidden';
+    frameDoc?.addEventListener('wheel', stopScroll, { passive: false });
+    frameDoc?.addEventListener('touchmove', stopScroll, { passive: false });
+
     return () => {
       window.removeEventListener('keydown', onKey);
-      document.body.style.overflow = prev;
+      window.removeEventListener('wheel', stopScroll);
+      window.removeEventListener('touchmove', stopScroll);
+      frameDoc?.removeEventListener('wheel', stopScroll);
+      frameDoc?.removeEventListener('touchmove', stopScroll);
+      if (frameHtml) frameHtml.style.overflow = frameOverflow;
+      if (frameBody) frameBody.style.overflow = frameBodyOverflow;
+      html.style.overflow = prev.htmlOverflow;
+      body.style.overflow = prev.bodyOverflow;
+      body.style.position = prev.position;
+      body.style.top = prev.top;
+      body.style.left = prev.left;
+      body.style.right = prev.right;
+      body.style.width = prev.width;
+      body.style.paddingRight = prev.paddingRight;
+      window.scrollTo(0, scrollY);
+      if (reveal) {
+        reveal.style.animation = '';
+        reveal.style.transform = '';
+        reveal.style.opacity = '';
+      }
     };
   }, [open, close, send]);
 
@@ -272,10 +527,8 @@ export default function GuestbookBook() {
         onLoad={() => {
           // The book posts `ready` as soon as its script runs, which can beat
           // React attaching the listener — so load is the reliable signal.
+          // Positioning waits for `ready` so the scroll pin can measure a live frame.
           setReady(true);
-          dock();
-          // The first dock measures before layout has fully settled, so fit it
-          // again once the book is sitting in its resting state.
           window.setTimeout(refit, 150);
         }}
         style={{
@@ -286,17 +539,6 @@ export default function GuestbookBook() {
           opacity: ready ? 1 : 0,
           // Full-viewport but inert while the book is flying home.
           pointerEvents: settling ? 'none' : 'auto',
-          // Clipping also clips hit-testing, so while docked only the book's own
-          // corner of the viewport is interactive — the rest of the footer keeps
-          // its clicks. The frame itself never resizes, so the book's layout
-          // (and therefore its animations) never reflow.
-          clipPath:
-            open || settling || !dockAt
-              ? undefined
-              : `inset(${Math.max(0, dockAt.top - PAD_TOP)}px ` +
-                `${Math.max(0, window.innerWidth - (dockAt.left + dockAt.width) - PAD_X)}px ` +
-                `${Math.max(0, window.innerHeight - (dockAt.top + dockAt.height) - PAD_BOTTOM)}px ` +
-                `${Math.max(0, dockAt.left - PAD_X)}px)`,
         }}
       />
     </div>

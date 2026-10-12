@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import GuestbookBook from './GuestbookBook';
 import { useLosAngelesTime } from './LocalTime';
 import GuestbookDotField from '@/components/GuestbookDotField';
@@ -57,7 +57,7 @@ export default function Footer() {
   const laTime = useLosAngelesTime();
   const ref = useRef<HTMLElement>(null);
   const featherRef = useRef<FeatherIconHandle>(null);
-  const [progress, setProgress] = useState(0);
+  const [revealed, setRevealed] = useState(false);
   // The dot canvas takes a colour, not a CSS variable, so the footer has to
   // know the theme itself. Light keeps the dark grey; night flips to white.
   const [night, setNight] = useState(false);
@@ -89,30 +89,74 @@ export default function Footer() {
     return () => window.clearInterval(id);
   }, []);
 
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
+  useLayoutEffect(() => {
+    const root = ref.current;
+    const image = root?.querySelector<HTMLElement>('.footer_reveal-image');
+    if (!root || !image) return;
     const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    // view() never starts: the footer's overflow clip sits between the image
+    // and the page. A root scroll timeline is not affected, and it stays locked
+    // to the scroll position, so a fast flick cannot leave the text catching up.
+    const viewDriven = !reduced && !!window.CSS?.supports?.('animation-timeline', 'scroll()');
 
+    const markRevealed = (on: boolean) => {
+      setRevealed((prev) => (prev === on ? prev : on));
+    };
+
+    const linearNow = () => {
+      const r = root.getBoundingClientRect();
+      const travel = Math.max(1, Math.min(r.height, window.innerHeight) * REVEAL_TRAVEL);
+      return Math.max(0, Math.min(1, (window.innerHeight - r.top) / travel));
+    };
+
+    if (viewDriven) {
+      // Compositor-locked slide. JS only publishes the distance the slide
+      // should cover, and flips the heart once the reveal has passed 0.35.
+      image.dataset.reveal = 'view';
+      const syncRange = () => {
+        const scroller = document.scrollingElement || document.documentElement;
+        const max = Math.max(1, scroller.scrollHeight - scroller.clientHeight);
+        const vh = window.innerHeight;
+        const top = root.getBoundingClientRect().top + window.scrollY;
+        const travel = Math.min(root.offsetHeight, vh) * REVEAL_TRAVEL;
+        const start = Math.max(0, top - vh);
+        const end = Math.min(max, start + travel);
+        const a = Math.max(0, Math.min(100, (start / max) * 100));
+        const b = Math.max(a + 0.01, Math.min(100, (end / max) * 100));
+        image.style.animationRange = `${a.toFixed(3)}% ${b.toFixed(3)}%`;
+      };
+      const syncFlag = () => markRevealed(easeOut(linearNow()) > 0.35);
+      syncRange();
+      syncFlag();
+      window.addEventListener('scroll', syncFlag, { passive: true });
+      window.addEventListener('resize', syncRange);
+      window.addEventListener('resize', syncFlag);
+      const ro = new ResizeObserver(syncRange);
+      ro.observe(document.documentElement);
+      return () => {
+        window.removeEventListener('scroll', syncFlag);
+        window.removeEventListener('resize', syncRange);
+        window.removeEventListener('resize', syncFlag);
+        ro.disconnect();
+      };
+    }
+
+    // Browsers without view timelines: write the transform directly. A React
+    // state update here lands a frame late and is what throws the text upward
+    // on a fast flick.
     let frame = 0;
-    const measure = () => {
+    const apply = () => {
       frame = 0;
-      const r = el.getBoundingClientRect();
-      if (!reduced) {
-        // 0 when the footer's top meets the bottom of the viewport, 1 once it has
-        // risen REVEAL_TRAVEL of its height — so the contents are fully up well
-        // before the footer finishes scrolling in.
-        const travel = Math.max(1, Math.min(r.height, window.innerHeight) * REVEAL_TRAVEL);
-        const linear = Math.max(0, Math.min(1, (window.innerHeight - r.top) / travel));
-        setProgress(easeOut(linear));
-      }
+      const p = reduced ? 1 : easeOut(linearNow());
+      image.style.transform = `translate3d(0px, ${((1 - p) * 100).toFixed(3)}%, 0px)`;
+      image.style.opacity = p.toFixed(5);
+      markRevealed(p > 0.35);
     };
     const schedule = () => {
-      if (!frame) frame = requestAnimationFrame(measure);
+      if (!frame) frame = requestAnimationFrame(apply);
     };
-
-    if (reduced) setProgress(1);
-    measure();
+    apply();
+    if (reduced) return;
     window.addEventListener('scroll', schedule, { passive: true });
     window.addEventListener('resize', schedule);
     return () => {
@@ -124,16 +168,8 @@ export default function Footer() {
 
   return (
     <aside className="footer_reveal" ref={ref}>
-      <div
-        className="footer_reveal-image"
-        style={{
-          willChange: 'transform, opacity',
-          transformStyle: 'preserve-3d',
-          transform: `translate3d(0px, ${((1 - progress) * 100).toFixed(3)}%, 0px)`,
-          opacity: progress.toFixed(5),
-        }}
-      >
-        <div className="footer_stage" data-revealed={progress > 0.35 ? 'true' : 'false'}>
+      <div className="footer_reveal-image">
+        <div className="footer_stage" data-revealed={revealed ? 'true' : 'false'}>
           <GuestbookDotField
             className="footer_dots"
             dotRadius={1.485}

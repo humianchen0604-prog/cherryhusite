@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { CursorFollowPill, useCursorFollowPill } from '@/components/casestudy/CursorFollowPill';
 import { CAMERA_PHOTOS, type Photo } from './cameraPhotos';
 import PolaroidCollage from './PolaroidCollage';
+import { GUESTBOOK_OPEN_EVENT, isGuestbookOpen } from '@/lib/guestbookOpen';
 
 /**
  * The camera reel that closes the About section — five cameras stacked on a
@@ -210,7 +211,8 @@ export default function CameraReel() {
   }, [applyLoop, selected]);
 
   /* Ambient autoplay while the wall is on screen. Off under reduced motion so
-     the page stays still for vestibular / focus needs. */
+     the page stays still for vestibular / focus needs, and held while the
+     guestbook is open over the page. It resumes from the same offset. */
   useEffect(() => {
     if (!gallery || isExactCollage) return;
     const scroller = scrollerRef.current;
@@ -224,7 +226,7 @@ export default function CameraReel() {
     let visible = false;
 
     const tick = (now: number) => {
-      if (!visible || document.hidden) {
+      if (!visible || document.hidden || isGuestbookOpen()) {
         last = 0;
         return;
       }
@@ -250,7 +252,7 @@ export default function CameraReel() {
     const io = new IntersectionObserver(
       ([entry]) => {
         visible = entry.isIntersecting && entry.intersectionRatio > 0.08;
-        if (visible && !document.hidden) start();
+        if (visible && !document.hidden && !isGuestbookOpen()) start();
         else stop();
       },
       { threshold: [0, 0.08, 0.2] },
@@ -258,15 +260,17 @@ export default function CameraReel() {
     io.observe(scroller);
 
     const onVis = () => {
-      if (document.hidden) stop();
+      if (document.hidden || isGuestbookOpen()) stop();
       else if (visible) start();
     };
     document.addEventListener('visibilitychange', onVis);
+    window.addEventListener(GUESTBOOK_OPEN_EVENT, onVis);
 
     return () => {
       stop();
       io.disconnect();
       document.removeEventListener('visibilitychange', onVis);
+      window.removeEventListener(GUESTBOOK_OPEN_EVENT, onVis);
     };
   }, [applyLoop, gallery, isExactCollage, selected]);
 

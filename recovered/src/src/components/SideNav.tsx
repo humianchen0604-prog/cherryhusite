@@ -13,7 +13,8 @@ export type SideNavItem = { label: string; id: string };
 const HOME_ITEMS: readonly SideNavItem[] = [
   { label: 'Projects', id: 'projects' },
   { label: 'Playground', id: 'vibecoding' },
-  { label: 'About', id: 'about' },
+  { label: 'Writings', id: 'writings' },
+  { label: 'About me', id: 'about' },
 ];
 
 export const CASE_STUDY_ITEMS: readonly SideNavItem[] = [

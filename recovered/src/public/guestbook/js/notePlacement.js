@@ -6,6 +6,12 @@
   'use strict';
 
   var NOTE_GAP_PX = 12;
+  /* NOTE_GAP_PX is the gap on the 372px desktop page; smaller pages get a
+     proportionally smaller gap, so spacing does not eat a small page. */
+  var NOTE_GAP_REF_WIDTH = 372;
+  function gapFor(cw) {
+    return Math.max(4, Math.min(NOTE_GAP_PX, Math.round(cw * NOTE_GAP_PX / NOTE_GAP_REF_WIDTH)));
+  }
   /* Edge padding as a fraction of the page. 6% left room for only one column
      of notes on a page; 4% fits two tilted notes side by side. */
   var NOTE_EDGE_PAD_FRAC = 0.04;
@@ -112,7 +118,7 @@
     var cw = options.containerWidth;
     var ch = options.containerHeight;
     var sizes = options.sizes || [];
-    var gap = options.gap != null ? options.gap : NOTE_GAP_PX;
+    var gap = options.gap != null ? options.gap : gapFor(cw);
     var attempts = options.attempts != null ? options.attempts : NOTE_PLACE_ATTEMPTS;
     var edgePadFrac = options.edgePadFrac != null ? options.edgePadFrac : NOTE_EDGE_PAD_FRAC;
     var random = options.random || Math.random;
@@ -257,7 +263,7 @@
     var size = options.size;
     var rotation = options.rotation;
     var occupied = options.occupied || [];
-    var gap = options.gap != null ? options.gap : NOTE_GAP_PX;
+    var gap = options.gap != null ? options.gap : gapFor(cw);
     var attempts = options.attempts != null ? options.attempts : NOTE_PLACE_ATTEMPTS;
     var edgePadFrac = options.edgePadFrac != null ? options.edgePadFrac : NOTE_EDGE_PAD_FRAC;
     var random = options.random || Math.random;

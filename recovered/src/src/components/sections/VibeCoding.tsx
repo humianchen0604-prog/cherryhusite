@@ -1,63 +1,6 @@
 import VaultLink from '@/components/VaultLink';
 import WritingLink from '@/components/WritingLink';
-import OtherDesigns, { PinchPrototype } from '@/components/OtherDesigns';
-
-/** An empty square for a prototype still being built: a wrench and "In
- *  development" in its centre until its media lands. */
-function PrototypeSlot({ n }: { n: 2 | 3 }) {
-  return (
-    <div className={`prototype-slot prototype-slot--${n}`}>
-      <span className="prototype-slot__badge">
-        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-          <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
-        </svg>
-        In development
-      </span>
-    </div>
-  );
-}
-
-/**
- * Three hand-drawn sparkles after the Playground heading, in outline only with
- * round pencil-like strokes: a larger four-pointed star on the left, and to its
- * right a small plus above and a small star below, not quite lined up. Each point is drawn a touch uneven (the bottom one longest), like a quick
- * doodle. They twinkle gently, out of step (see .twinkle in globals.css).
- */
-function star(cx: number, cy: number, r: number, wobble = 0) {
-  // Top, right, bottom, left points; the curves pinch in toward the centre.
-  const top = [cx + wobble * 0.3, cy - r];
-  const right = [cx + r * 0.72, cy + wobble * 0.2];
-  const bottom = [cx - wobble * 0.2, cy + r * 1.12];
-  const left = [cx - r * 0.7, cy - wobble * 0.15];
-  const k = r * 0.14;
-  const f = (n: number) => n.toFixed(2);
-  return [
-    `M${f(top[0])} ${f(top[1])}`,
-    `Q${f(cx + k)} ${f(cy - k)} ${f(right[0])} ${f(right[1])}`,
-    `Q${f(cx + k)} ${f(cy + k)} ${f(bottom[0])} ${f(bottom[1])}`,
-    `Q${f(cx - k)} ${f(cy + k)} ${f(left[0])} ${f(left[1])}`,
-    `Q${f(cx - k)} ${f(cy - k)} ${f(top[0])} ${f(top[1])}Z`,
-  ].join(' ');
-}
-
-/** A hand-drawn plus: two slightly bent strokes, crossing a touch off-centre. */
-function plus(cx: number, cy: number, r: number) {
-  const f = (n: number) => n.toFixed(2);
-  return [
-    `M${f(cx + 0.25)} ${f(cy - r)} Q${f(cx - 0.35)} ${f(cy)} ${f(cx - 0.1)} ${f(cy + r * 1.05)}`,
-    `M${f(cx - r * 0.95)} ${f(cy + 0.3)} Q${f(cx)} ${f(cy - 0.35)} ${f(cx + r)} ${f(cy + 0.05)}`,
-  ].join(' ');
-}
-
-function Twinkle() {
-  return (
-    <svg className="twinkle" viewBox="0 0 28 24" aria-hidden="true">
-      <path className="twinkle__star twinkle__star--big" d={star(9, 12.5, 8.6, 0.6)} />
-      <path className="twinkle__star twinkle__star--top" d={plus(19.6, 5.6, 3.6)} />
-      <path className="twinkle__star twinkle__star--low" d={star(22.4, 17.3, 3.8, 0.3)} />
-    </svg>
-  );
-}
+import OtherDesigns, { LanguagePrototype, PinchPrototype, TextingPrototype } from '@/components/OtherDesigns';
 
 export default function VibeCoding() {
   return (
@@ -75,7 +18,6 @@ export default function VibeCoding() {
             <div className="framer-1wgmwxf" data-framer-name="Title" data-framer-component-type="RichTextContainer" style={{"transform":"none"} as React.CSSProperties}>
               <h2 dir="auto" style={{"--font-selector":"RlM7U3dpdHplci1yZWd1bGFy","--framer-font-family":"\"Switzer\", \"Switzer Placeholder\", sans-serif","--framer-font-size":"18px","--framer-letter-spacing":"-0.01em","--framer-line-height":"140%"} as React.CSSProperties} className="framer-text">
                 {"Prototyping concepts that make interfaces feel friendlier and more delightful"}
-                <Twinkle />
               </h2>
             </div>
           </div>
@@ -91,12 +33,15 @@ export default function VibeCoding() {
                   <PinchPrototype />
                 </div>
               </div>
-              {/* Two slots for the prototypes coming next (language feedback,
-                  visual podcasts): empty squares until their media lands,
-                  three to the row with Pinch ("Recent prototypes: three to a
-                  row" in globals.css). Their copy is already written below. */}
-              <PrototypeSlot n={2} />
-              <PrototypeSlot n={3} />
+              {/* Language feedback and animated text bubbles, three to the row
+                  with Pinch ("Recent prototypes: three to a row" in
+                  globals.css). */}
+              <div className="prototype-slot prototype-slot--2 prototype-slot--filled">
+                <LanguagePrototype />
+              </div>
+              <div className="prototype-slot prototype-slot--3 prototype-slot--filled">
+                <TextingPrototype />
+              </div>
             </div>
             <div className="framer-1qsawwe">
               <div className="framer-146wvo3">
@@ -119,19 +64,19 @@ export default function VibeCoding() {
                 </div>
                 <div className="framer-duoqtt" data-framer-name="Description" data-framer-component-type="RichTextContainer" style={{"transform":"none"} as React.CSSProperties}>
                   <p dir="auto" style={{"--font-selector":"RlM7U3dpdHplci1yZWd1bGFy","--framer-font-family":"\"Switzer\", \"Switzer Placeholder\", sans-serif","--framer-font-size":"12px","--framer-line-height":"140%","--framer-text-color":"rgba(0, 0, 0, 0.8)"} as React.CSSProperties} className="framer-text">
-                    {"Seeing pronunciation on screen as you speak a foreign language, so you catch where a sound drifts and correct it in the moment rather than after."}
+                    {"Gentle mirror for learning a language: Words appear on the screen as you say them, so any drifting sound is easy to notice & correct in the moment."}
                   </p>
                 </div>
               </div>
               <div className="prototype-caption prototype-caption--3">
                 <div className="framer-33iy5c" data-framer-name="Title" data-framer-component-type="RichTextContainer" style={{"transform":"none"} as React.CSSProperties}>
                   <h2 dir="auto" style={{"--font-selector":"RlM7U3dpdHplci1yZWd1bGFy","--framer-font-family":"\"Switzer\", \"Switzer Placeholder\", sans-serif","--framer-font-size":"14px","--framer-letter-spacing":"-0.01em","--framer-line-height":"140%"} as React.CSSProperties} className="framer-text">
-                    {"Reimagining podcasts with visuals"}
+                    {"Text bubbles that feel what you say"}
                   </h2>
                 </div>
                 <div className="framer-duoqtt" data-framer-name="Description" data-framer-component-type="RichTextContainer" style={{"transform":"none"} as React.CSSProperties}>
                   <p dir="auto" style={{"--font-selector":"RlM7U3dpdHplci1yZWd1bGFy","--framer-font-family":"\"Switzer\", \"Switzer Placeholder\", sans-serif","--framer-font-size":"12px","--framer-line-height":"140%","--framer-text-color":"rgba(0, 0, 0, 0.8)"} as React.CSSProperties} className="framer-text">
-                    {"Imagining podcasts with video and supporting assets — the clips, images and references being discussed appear alongside the conversation as it happens."}
+                    {"Each bubble picks up the mood of its message, so a tired “I just woke up” looks as sleepy as it sounds."}
                   </p>
                 </div>
               </div>
@@ -142,7 +87,8 @@ export default function VibeCoding() {
         {/* The Vault and the writing log beside it, last in Playground: their
             own section under Other designs, spaced like it ("Playground: Vault
             section" in globals.css). */}
-        <section className="playground-vault" aria-label="Vault and writings">
+        <section className="playground-vault" id="writings" aria-label="Vault and writings">
+          <p className="playground-vault__label">{"WRITINGS"}</p>
           <div className="framer-1y0yjav">
             <div className="framer-1i32gb2" data-framer-name="Title" data-framer-component-type="RichTextContainer" style={{"transform":"none"} as React.CSSProperties}>
               <h2 dir="auto" style={{"--font-selector":"RlM7U3dpdHplci1yZWd1bGFy","--framer-font-family":"\"Switzer\", \"Switzer Placeholder\", sans-serif","--framer-font-size":"18px","--framer-letter-spacing":"-0.01em","--framer-line-height":"140%"} as React.CSSProperties} className="framer-text">

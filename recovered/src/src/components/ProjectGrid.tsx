@@ -3,22 +3,6 @@
 import { CursorFollowPill, useCursorFollowPill } from '@/components/casestudy/CursorFollowPill';
 import { PROJECTS, type Project } from '@/components/projects-data';
 import TikTokProjectCover from '@/components/TikTokProjectCover';
-import { openCaseStudy } from '@/components/CaseStudyModal';
-
-// Warm a case study's iframe document on hover so the first click isn't a cold
-// load. One <link rel="prefetch"> per route, injected once.
-const prefetched = new Set<string>();
-function prefetchCase(href: string) {
-  if (typeof document === 'undefined') return;
-  const url = `${href.replace(/\/+$/, '')}?embed=1`;
-  if (prefetched.has(url)) return;
-  prefetched.add(url);
-  const link = document.createElement('link');
-  link.rel = 'prefetch';
-  link.as = 'document';
-  link.href = url;
-  document.head.appendChild(link);
-}
 
 /**
  * Featured projects, laid out the way angelinacao.com presents hers: two vertical
@@ -80,28 +64,12 @@ export function ProjectCard({ project, order }: { project: Project; order?: numb
     order == null ? undefined : ({ '--card-order': order } as React.CSSProperties);
 
   // Only some have somewhere to go; the rest must not look or behave like links.
-  // The pill shows "View project" on every card regardless — it's a hover
-  // affordance for the whole preview, not a promise that this one is clickable.
+  // A click follows the link to the case study. These thumbnails do not open
+  // the in-page preview panel.
   return (
     <>
       {project.href ? (
-        <a
-          className="project-card"
-          href={project.href}
-          style={style}
-          {...pillHandlers}
-          onMouseEnter={(e) => {
-            pillHandlers.onMouseEnter?.(e);
-            prefetchCase(project.href!);
-          }}
-          onClick={(e) => {
-            // Plain clicks open the preview panel; cmd/ctrl/middle-click keep
-            // the normal new-tab behaviour.
-            if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
-            e.preventDefault();
-            openCaseStudy(project.href!);
-          }}
-        >
+        <a className="project-card" href={project.href} style={style} {...pillHandlers}>
           {body}
         </a>
       ) : (

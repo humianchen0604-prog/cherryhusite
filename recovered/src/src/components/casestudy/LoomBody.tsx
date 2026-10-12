@@ -130,28 +130,17 @@ function MediaSlot({
 }
 
 /**
- * The process reel replacing the slide-39 still: same slot, but a live HTML/SVG
- * loop (built to the deck's exact diamond geometry) standing in for what was a
- * static before/after pair. Self-contained page (own script, own render loop),
- * so it's embedded as an iframe rather than inlined.
- *
- * Same width as the solution-05 video reel (1920 wide), 3/5 its height — the
- * scene's own preserveAspectRatio="xMidYMid meet" scales the diamonds down to
- * fit the shorter frame instead of cropping them.
- *
- * Text-to-media gap: it sits in .framer-eahql, whose 16px flex gap is wider
- * than the 12px SolutionCard gap the golden rule's 44px (12 + 32) assumes —
- * so .loom-media's own 32px margin-top is trimmed to 28px here to land on
- * that same 44px total instead of 48px.
+ * The new-process diagram under the process intro. Full width of the column,
+ * its own aspect, 28px under the paragraph so the gap still lands on the
+ * case-study text-to-media measure.
  */
-function LoomProcessReel({ ratio = '1920 / 681.6' }: { ratio?: string }) {
+function LoomProcessReel() {
   return (
-    <div className="loom-media loom-process-reel" style={{ width: '100%', aspectRatio: ratio, marginTop: '28px' } as React.CSSProperties}>
-      <iframe
-        src="/assets/loom/process-reel.html"
-        title="Double Diamond process, evolving into a continuous iteration loop"
-        loading="lazy"
-        style={{ width: '100%', height: '100%', display: 'block', border: 0 }}
+    <div className="loom-media loom-process-reel" style={{ marginTop: '28px' }}>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src="/assets/loom/new-design-process.png"
+        alt="New Design Process: four diamonds shrinking from Concept to Launch, each split into Design and Deliver"
       />
     </div>
   );
@@ -447,17 +436,9 @@ export default function LoomBody() {
                         {' the work is happening — reading everything that lands on the canvas, noticing when directions start fighting each other, and turning that into a decision instead of another meeting.'}
                       </Body>
                       <LoomLinks prototypeUrl={PROTOTYPE_URL} />
-                      {/* Overview media — a #fafafa placeholder at the same aspect
-                          ratio as the first Solution video (1920 × 1238). */}
-                      <div
-                        className="loom-media loom-overview-placeholder"
-                        style={{ width: '100%', aspectRatio: '1920 / 1238' } as React.CSSProperties}
-                        role="img"
-                        aria-label="Overview image placeholder"
-                      />
-                      {/* Attribution for the placeholder artwork in the prototype
-                          screens — smaller and lighter than the body copy, so it
-                          reads as a footnote rather than part of the pitch. */}
+                      {/* Attribution for the artwork in the prototype screens —
+                          smaller and lighter than the body copy, so it reads as a
+                          footnote rather than part of the pitch. */}
                       <p className="loom-disclaimer">
                         {'All imagery shown in the prototype is sourced from the internet and used for demonstration purposes only.'}
                       </p>
@@ -628,7 +609,7 @@ export default function LoomBody() {
                       <Body>{'Traditional design process was built to lower the cost of designing the wrong thing.'}</Body>
                       <Body>{'Often times I found myself with little time left to work on the product’s craftsmanship. Vibe coding compresses validation into fast, live prototyping — buying back time for visuals and taste.'}</Body>
 
-                      <LoomProcessReel ratio="1920 / 681.6" />
+                      <LoomProcessReel />
 
                       <Body style={{ marginTop: '28px', marginBottom: '28px' }}>{'Here’s how I kicked off the project.'}</Body>
                     </div>

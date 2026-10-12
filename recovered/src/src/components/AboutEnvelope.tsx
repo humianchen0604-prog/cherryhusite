@@ -25,7 +25,7 @@ const EMAIL_TOAST_MS = 1200;
 // environment. Bump EMBED_VERSION after a rebuild so the iframe does not
 // keep a cached older index.html.
 const EMBED_ORIGIN = '/about-envelope';
-const EMBED_VERSION = 94;
+const EMBED_VERSION = 95;
 
 // The iframe itself is always 520px tall; the slot it reserves is shorter and
 // steps with the column width. Measured on the live site at column widths

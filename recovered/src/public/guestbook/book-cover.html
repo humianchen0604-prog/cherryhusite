@@ -10,9 +10,10 @@
   <link rel="preload" as="image" href="Assets/Images/Back.png?v=1785618989" />
   <meta name="guestbook-cloud" content="auto" />
   <script src="vendor/page-flip.browser.js"></script>
-  <script src="js/notePlacement.js"></script>
+  <script src="js/notePlacement.js?v=20261012-gap"></script>
   <script src="js/profanityFilter.js"></script>
-  <script src="js/guestbookApi.js?v=20260921-persist"></script>
+  <script src="js/seedEntries.js?v=live-2026-10-12-inks2"></script>
+  <script src="js/guestbookApi.js?v=20261012-seed2"></script>
   <style>
     @font-face {
       font-family: 'Ugly Dave';
@@ -58,14 +59,16 @@
     }
 
     /*
-     * Frost scrim — lighter/airier than envelope dark gray
-     * (blur still matches About me: blur(14px) saturate(1.05))
-     * Soft warm gray-cream tint — more presence than a cream wash,
-     * lighter than the original heavy gray dim.
-     * Click dismisses like the envelope frost overlay.
+     * Backdrop — no fill at all, just a heavy blur of the page itself (40px,
+     * up from the original 21px), so the page keeps its own colours and only
+     * loses its detail behind the book.
      *
-     * Full blur always on the layer; opacity 0→1 reads as
-     * “blur fading in” and overlaps the cover flip-open (~600ms).
+     * The full blur always sits on the layer and only opacity animates, so it
+     * reads as the blur fading in rather than a radius recomputed every frame.
+     * Enter 420ms on the drawer curve (0.32, 0.72, 0, 1): it starts at once
+     * and eases into the last of the blur instead of snapping. Exit is
+     * quicker and runs with the book's flight home (body.is-closing-home).
+     * Click dismisses like the envelope frost overlay.
      */
     .frost-overlay {
       position: fixed;
@@ -73,24 +76,20 @@
       z-index: 1;
       opacity: 0;
       pointer-events: none;
-      background: linear-gradient(
-        180deg,
-        rgba(60, 55, 52, 0.10) 0%,
-        rgba(40, 38, 36, 0.14) 100%
-      );
-      backdrop-filter: blur(21px) saturate(1.05);
-      -webkit-backdrop-filter: blur(21px) saturate(1.05);
+      background: transparent;
+      backdrop-filter: blur(40px) saturate(1.1);
+      -webkit-backdrop-filter: blur(40px) saturate(1.1);
       will-change: opacity;
-      /* Exit: ~25% faster than enter (base state = leaving .is-active) */
-      transition: opacity var(--modal-exit) var(--modal-ease);
+      /* Exit (base state = leaving .is-active): quicker than the enter. */
+      transition: opacity 300ms cubic-bezier(0.23, 1, 0.32, 1);
       cursor: pointer;
     }
 
     .frost-overlay.is-active {
       opacity: 1;
       pointer-events: auto;
-      /* Enter: fades across the start of the cover flip */
-      transition: opacity var(--modal-enter) var(--modal-ease);
+      /* Enter: across the cover flip, settling softly into the full blur. */
+      transition: opacity 420ms cubic-bezier(0.32, 0.72, 0, 1);
     }
 
     /* ── Stage ────────────────────────────────────────────────
@@ -946,14 +945,20 @@
       container-type: inline-size;
     }
 
+    /*
+     * Every note size below is multiplied by --note-scale: 1 on desktop, 0.8
+     * on tablet, 0.6 on phone (set at the end of this block), so the written
+     * notes shrink as one on smaller books. Stickers are em-sized and follow.
+     */
     .scatter-note {
+      --note-scale: 1;
       position: absolute;
       max-width: min(220px, 42%);
       line-height: 1.15;
       font-family: 'Ugly Dave', cursive, sans-serif;
       /* Fluid type — shrinks on narrower page containers */
-      font-size: clamp(12px, 3.2vw, 14pt);
-      font-size: clamp(12px, 5.5cqi, 14pt);
+      font-size: calc(clamp(12px, 3.2vw, 14pt) * var(--note-scale));
+      font-size: calc(clamp(12px, 5.5cqi, 14pt) * var(--note-scale));
       /* Black ink; meta sits gray via opacity below. */
       color: #1C1C1C;
       pointer-events: none;
@@ -970,10 +975,11 @@
     }
 
     .scatter-note .entry-message {
-      display: block;
-      font-size: clamp(12px, 3.2vw, 14pt);
-      font-size: clamp(12px, 5.5cqi, 14pt);
-      color: #1C1C1C;
+      display: inline;
+      font-size: calc(clamp(12px, 3.2vw, 14pt) * var(--note-scale));
+      font-size: calc(clamp(12px, 5.5cqi, 14pt) * var(--note-scale));
+      /* The note's ink, set inline from the pen it was written with. */
+      color: inherit;
     }
 
     .scatter-note .entry-line {
@@ -986,9 +992,67 @@
     .scatter-note .entry-meta {
       display: block;
       color: #6B6B6B;
+      /* Same pen, lighter hand: black ink lands on the original #6B6B6B. */
+      color: color-mix(in srgb, currentColor 66%, #FCF9F5);
       opacity: 1;
-      font-size: clamp(10px, 2.6vw, 10.5pt);
-      font-size: clamp(10px, 4.4cqi, 10.5pt);
+      font-size: calc(clamp(6px, 2.6vw, 10.5pt) * var(--note-scale));
+      font-size: calc(clamp(6px, 4.4cqi, 10.5pt) * var(--note-scale));
+    }
+
+    /* Heart (Figma 2475:843), happy face (Figma 2475:844),
+       sunglasses (Figma 2475:887), fire (Figma 2476:901), sparkle
+       (Figma 2486:33), drawn at
+       0.88 of those frames. The strokes are #F5F5F5, made for a dark
+       tray; on the cream page they read as the same ink as the note. */
+    /* Inline so stickers trail the last word, not the wrapped box's edge. */
+    .scatter-note .entry-message-row {
+      display: block;
+    }
+
+    .scatter-note .entry-stickers {
+      display: inline-flex;
+      align-items: flex-end;
+      gap: 0.12em;
+      pointer-events: none;
+    }
+
+    .scatter-note .entry-message + .entry-stickers {
+      margin-left: 0.15em;
+    }
+
+    .scatter-note .entry-sticker {
+      display: block;
+      flex: none;
+    }
+
+    /* Stroke art as a mask; the fill is the note's ink (currentColor). */
+    .scatter-note .entry-sticker-ink {
+      display: block;
+      flex: none;
+      background-color: currentColor;
+      -webkit-mask-size: 100% 100%;
+      mask-size: 100% 100%;
+      -webkit-mask-repeat: no-repeat;
+      mask-repeat: no-repeat;
+    }
+
+    /* Outer flame plus the inner tongue, in the frame's own offsets. */
+    /* Frame and core offsets at STICKER_SCALE (0.04em) of the Figma values. */
+    .scatter-note .entry-sticker--fire {
+      position: relative;
+      width: calc(15.4521em * 0.04);
+      height: calc(19.9084em * 0.04);
+    }
+
+    .scatter-note .entry-sticker--fire .entry-sticker-ink {
+      position: absolute;
+      left: 0;
+      top: 0;
+    }
+
+    .scatter-note .entry-sticker--fire .entry-sticker__fire-core {
+      left: calc(2.6497em * 0.04);
+      top: calc(9.335em * 0.04);
     }
 
     /* Desktop: message + name/date 4px smaller than the fluid caps above. */
@@ -1002,20 +1066,50 @@
       }
     }
 
+    /*
+     * Message size by word count (data-size, set in createScatterNote):
+     * under 4 words 22px, 4–12 words 16px, 13+ words 12px. Those are the sizes
+     * on the 372px-wide desktop page; cqi keeps the same ratio on smaller books.
+     * The px floors sit low on purpose: higher floors (13 / 10 / 8px) held the
+     * text up on small books until a note took half the page width and only
+     * one column fitted. Proportional text keeps two (or three) to a row.
+     */
+    /* Stickers share the message size; their em dimensions scale from it. */
+    .scatter-note[data-size="lg"] .entry-message,
+    .scatter-note[data-size="lg"] .entry-stickers {
+      font-size: calc(clamp(7px, calc(22cqi / 3.72), 22px) * var(--note-scale));
+    }
+    .scatter-note[data-size="md"] .entry-message,
+    .scatter-note[data-size="md"] .entry-stickers {
+      font-size: calc(clamp(6px, calc(16cqi / 3.72), 16px) * var(--note-scale));
+    }
+    .scatter-note[data-size="sm"] .entry-message,
+    .scatter-note[data-size="sm"] .entry-stickers {
+      font-size: calc(clamp(5px, calc(12cqi / 3.72), 12px) * var(--note-scale));
+    }
+
     /* Name + date, 2px smaller on tablet and phone. On phone the old size was
        already sitting on its 10px floor, so the floor drops to 8px with it —
        otherwise the clamp would swallow the change. */
     @media (max-width: 1199.98px) {
       .scatter-note .entry-meta {
-        font-size: clamp(8px, calc(2.6vw - 2px), calc(10.5pt - 2px));
-        font-size: clamp(8px, calc(4.4cqi - 2px), calc(10.5pt - 2px));
+        font-size: calc(clamp(5px, calc(2.6vw - 2px), calc(10.5pt - 2px)) * var(--note-scale));
+        font-size: calc(clamp(5px, calc(4.4cqi - 2px), calc(10.5pt - 2px)) * var(--note-scale));
       }
+    }
+
+    /* Written notes, all text together: 80% on tablet, 60% on phone. */
+    @media (max-width: 1199.98px) {
+      .scatter-note { --note-scale: 0.8; }
+    }
+    @media (max-width: 640px) {
+      .scatter-note { --note-scale: 0.6; }
     }
 
     /* ── Message input (Figma 1551:28298 / 1551:28306) ─────────── */
     /*
-     * Dock keeps a fixed collapsed footprint in the body flex column
-     * (hint + message row). The pill is absolutely pinned inside
+     * Dock keeps a fixed collapsed footprint in the body flex column.
+     * The pill is absolutely pinned inside
      * .message-dock-slot so the name row expands downward into empty
      * space without shifting #stage / frost / book.
      */
@@ -1026,7 +1120,12 @@
       flex-direction: column;
       align-items: center;
       width: min(480pt, 92vw);
+      /* Placeholder and typed message share this size. */
+      --message-size: 14px;
+      /* Chosen pen. Typed message and name pick this up; placeholders stay gray. */
+      --ink: #1C1C1C;
       flex-shrink: 0;
+      margin-top: -8px;
       opacity: 0;
       visibility: hidden;
       pointer-events: none;
@@ -1049,14 +1148,33 @@
         visibility var(--input-fade);
     }
 
-    /* One-line arrow-key tip — desktop only; sits 24px above the pill. */
+    /* One-line arrow-key tip, pinned 32px above the bottom of the viewport.
+       A sibling of the dock rather than inside it: the dock's scale transform
+       would turn position: fixed into dock-relative. It shows with the dock.
+       Hidden while body lacks .show-page-turn-hint (SHOW_PAGE_TURN_HINT in JS). */
+    body:not(.show-page-turn-hint) .page-turn-hint {
+      display: none !important;
+      visibility: hidden !important;
+      opacity: 0 !important;
+      pointer-events: none !important;
+    }
+
     .page-turn-hint {
       display: none;
-      /* The body's column gap (same clamp) sets book → dock spacing; pull the
-         hint back up so it sits 18px under the book instead. */
-      margin: calc(18px - clamp(20px, 3.5vh, 36px)) 0 24px;
+      position: fixed;
+      z-index: 3;
+      left: 50%;
+      bottom: 32px;
+      transform: translateX(-50%);
+      opacity: 0;
+      visibility: hidden;
+      transition:
+        opacity var(--input-exit) var(--input-ease),
+        visibility var(--input-exit);
+      margin: 0;
       padding: 0;
-      color: #C7C7CC;
+      /* Light on the gray frost, in step with the glass key caps. */
+      color: rgb(255 255 255 / 0.6);
       font-family: 'Switzer', sans-serif;
       font-size: 13px;
       font-weight: 400;
@@ -1066,6 +1184,33 @@
       text-align: center;
       pointer-events: none;
       user-select: none;
+    }
+
+    .page-turn-hint.is-visible {
+      opacity: 1;
+      visibility: visible;
+      transition:
+        opacity var(--input-fade) var(--input-ease),
+        visibility var(--input-fade);
+    }
+
+    /* Narrow windows: the hint and the ink-picker menu (lower left) would
+       share a line, so the hint steps up above the menu. */
+    @media (max-width: 880px) {
+      .page-turn-hint { bottom: 64px; }
+    }
+
+    /* Pens racked along the bottom edge: lift the hint clear of them. */
+    body.has-bottom-pens .page-turn-hint { bottom: 96px; }
+
+    /* Tablet and phone: no keyboard hint (and no tap hint) at all. */
+    @media (max-width: 1199.98px) {
+      .page-turn-hint { display: none !important; }
+    }
+
+    body.is-docked .page-turn-hint {
+      opacity: 0 !important;
+      visibility: hidden !important;
     }
 
     .page-turn-hint--touch { display: block; }
@@ -1088,17 +1233,28 @@
       height: 16px;
       flex-shrink: 0;
       border-radius: 4px;
-      border: 1px solid rgb(0 0 0 / 0.18);
-      background: #FAFAFA;
-      color: rgb(0 0 0 / 0.55);
-      box-shadow: 0 1px 0 rgb(0 0 0 / 0.06);
+      /* Glass caps, the same recipe as the Bar ink picker: a light white wash
+         over a small blur, a white rim, a bright top lip and a dark hairline. */
+      border: 1px solid rgb(255 255 255 / 0.30);
+      background:
+        linear-gradient(180deg, rgb(255 255 255 / 0.18) 0%, rgb(255 255 255 / 0.10) 100%);
+      backdrop-filter: blur(6px) saturate(1.8);
+      -webkit-backdrop-filter: blur(6px) saturate(1.8);
+      color: rgb(255 255 255 / 0.9);
+      box-shadow:
+        inset 0 1px 0 rgb(255 255 255 / 0.35),
+        0 0 0 0.5px rgb(0 0 0 / 0.16),
+        0 1px 2px rgb(0 0 0 / 0.18);
       /* Real buttons: clicking a key cap turns the page like the arrow key. */
       padding: 0;
       font: inherit;
       cursor: pointer;
       pointer-events: auto;
       -webkit-tap-highlight-color: transparent;
-      transition: transform 120ms ease-out, background-color 120ms ease-out;
+      transition:
+        transform 120ms ease-out,
+        background-color 120ms ease-out,
+        color 120ms ease-out;
     }
 
     /* Word key (esc): same cap, sized to its label instead of square. */
@@ -1111,7 +1267,13 @@
       letter-spacing: 0;
     }
 
-    .page-turn-hint__key:hover { background: #FFFFFF; }
+    @media (hover: hover) and (pointer: fine) {
+      .page-turn-hint__key:hover {
+        background:
+          linear-gradient(180deg, rgb(255 255 255 / 0.28) 0%, rgb(255 255 255 / 0.18) 100%);
+        color: #FFFFFF;
+      }
+    }
     .page-turn-hint__key:active { transform: scale(0.9); }
     .page-turn-hint__key:focus-visible {
       outline: 2px solid #FFFFFF;
@@ -1127,7 +1289,8 @@
     .message-dock-slot {
       position: relative;
       width: 100%;
-      height: 42pt; /* phone / tablet / small desktop; 64pt at tall viewports */
+      /* At least the original row, and taller when the active step needs it. */
+      height: max(42pt, calc(var(--message-size) * 1.15 + 18px));
     }
 
     .message-error {
@@ -1183,12 +1346,10 @@
       align-items: center;
       gap: 12px;
       width: 100%;
-      /* 48pt (64px) less 8px — 4px off the top and 4px off the bottom. The
-         padding is not the lever here: box-sizing is border-box and the height
-         is fixed, so trimming padding only grows the field inside the same
-         pill. */
-      height: 42pt;
-      min-height: 42pt;
+      /* Grows with the active type step so 32px display type is not clipped.
+         The 42pt floor keeps the resting pill at its original height. */
+      height: max(42pt, calc(var(--message-size) * 1.15 + 18px));
+      min-height: max(42pt, calc(var(--message-size) * 1.15 + 18px));
       box-sizing: border-box;
       padding: 8px calc(16pt - 8px) 8px 14px; /* 8px off each side from the original 16pt / 22px */
     }
@@ -1234,7 +1395,8 @@
       border: 0;
       outline: none;
       background: transparent;
-      color: #1C1C1C;
+      /* Same pen as the message, at 80% of that ink. */
+      color: color-mix(in srgb, var(--ink, #1C1C1C) 80%, transparent);
       font-family: 'Switzer', sans-serif;
       font-size: 14px;
       font-weight: 400;
@@ -1263,11 +1425,10 @@
       width: 100%;
       min-height: 28px;
       font-family: 'Switzer', sans-serif;
-      /* 14px, matching #name-input below. Placeholder and typed text are the
-         same element here, so this sets both. */
-      font-size: 14px;
+      /* Placeholder and typed text are the same element, so this sets both. */
+      font-size: var(--message-size);
       font-weight: 400;
-      line-height: 1.35;
+      line-height: 1.15;
       letter-spacing: -0.01em;
       white-space: pre;
       overflow: hidden;
@@ -1275,7 +1436,7 @@
     }
 
     .message-mirror-text {
-      color: #1C1C1C;
+      color: var(--ink, #1C1C1C);
     }
 
     .message-mirror.is-empty .message-mirror-text {
@@ -1293,7 +1454,7 @@
       width: 1.25pt; /* thinner stroke than the original 2pt */
       height: 1.05em;
       margin-left: 2pt; /* Figma typed state: 2pt gap after last glyph */
-      background: #1C1C1C;
+      background: var(--ink, #1C1C1C);
       border-radius: 999px; /* round/pill caps on short vertical bar */
       animation: message-caret-blink 1.05s steps(1, end) infinite;
     }
@@ -1304,6 +1465,25 @@
 
     .message-pill.is-empty.is-focused .message-caret {
       margin-left: 0;
+    }
+
+    /*
+     * Touch: the field takes focus as the book opens (keyboard up by default),
+     * so the placeholder stays put while it is empty and the caret blinks in
+     * front of it. Native inputs at 16px: iOS zooms the page into any field
+     * under 16px on focus. The message field's own text is transparent (the
+     * mirror draws it), so only the name field visibly grows.
+     */
+    @media (pointer: coarse) {
+      .message-pill.is-empty.is-focused .message-mirror-text { display: inline; }
+      .message-pill.is-empty.is-focused .message-caret {
+        order: -1;
+        margin: 0 2pt 0 0;
+      }
+      #message-input,
+      .message-native,
+      #name-input,
+      .name-native { font-size: 16px; }
     }
 
     @keyframes message-caret-blink {
@@ -1323,9 +1503,9 @@
       color: transparent;
       caret-color: transparent;
       font-family: 'Switzer', sans-serif;
-      font-size: 14px; /* keep in step with .message-mirror */
+      font-size: var(--message-size); /* keep in step with .message-mirror */
       font-weight: 400;
-      line-height: 1.35;
+      line-height: 1.15;
       letter-spacing: -0.01em;
     }
 
@@ -1358,7 +1538,8 @@
     .message-send.is-ready,
     .message-pill.is-ready .message-send {
       background: transparent;
-      color: #000;
+      /* The plane is drawn in the chosen pen, like the message it sends. */
+      color: var(--ink, #1C1C1C);
       cursor: pointer;
     }
 
@@ -1367,7 +1548,7 @@
     .message-pill.is-ready .message-send:hover,
     .message-pill.is-ready .message-send:focus-visible {
       background: transparent;
-      color: #000;
+      color: var(--ink, #1C1C1C);
       outline: none;
     }
 
@@ -1419,6 +1600,887 @@
         stroke-dashoffset 0.55s ease 0.1s;
     }
 
+    /* ── Pen rack ──────────────────────────────────────────────
+     * Ink picker parked on the viewport's right edge; only the tip, collar
+     * and a sliver of barrel show. Two layers so motions never fight:
+     *   .pen        enter/exit slide (staggered by --i)
+     *   .pen__body  hover / selected nudge (--nudge)
+     * Pen art is 640x78.
+     */
+    .pen-rack {
+      --pen-h: 24px;
+      --pen-w: calc(var(--pen-h) * 640 / 78);
+      --pen-peek: 58px;
+      --pen-hover: 10px;
+      --pen-selected: 26px;
+      --pen-gap: 14px;
+      --pen-enter: 460ms;
+      --pen-enter-delay: 80ms;
+      --pen-enter-stagger: 35ms;
+      --pen-enter-ease: cubic-bezier(0.32, 0.72, 0, 1);
+      --pen-exit: 220ms;
+      --pen-exit-stagger: 12ms;
+      --pen-exit-ease: cubic-bezier(0.23, 1, 0.32, 1);
+      position: fixed;
+      top: 50%;
+      right: 0;
+      z-index: 4;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: var(--pen-gap);
+      transform: translateY(-50%);
+      pointer-events: none;
+      visibility: hidden;
+      /* Stay painted until the last pen has slid off. */
+      transition: visibility 0s linear calc(var(--pen-exit) + 6 * var(--pen-exit-stagger));
+    }
+
+    .pen-rack.is-visible {
+      visibility: visible;
+      /* bottom: rides on top of the phone keyboard (fitAboveKeyboard). */
+      transition:
+        visibility 0s,
+        bottom 280ms cubic-bezier(0.32, 0.72, 0, 1);
+    }
+
+    .pen {
+      position: relative;
+      display: block;
+      flex: 0 0 auto;
+      width: var(--pen-w);
+      height: var(--pen-h);
+      /* Hang the barrel off the edge so only --pen-peek is on screen. */
+      margin-right: calc(var(--pen-peek) - var(--pen-w));
+      padding: 0;
+      border: 0;
+      background: none;
+      appearance: none;
+      cursor: pointer;
+      pointer-events: none;
+      -webkit-tap-highlight-color: transparent;
+      outline: none;
+      transform: translateX(calc(var(--pen-peek) + var(--pen-selected) + 12px));
+      transition: transform var(--pen-exit) var(--pen-exit-ease)
+        calc(var(--i) * var(--pen-exit-stagger));
+    }
+
+    .pen-rack.is-visible .pen {
+      pointer-events: auto;
+      transform: translateX(0);
+      transition: transform var(--pen-enter) var(--pen-enter-ease)
+        calc(var(--pen-enter-delay) + var(--i) * var(--pen-enter-stagger));
+    }
+
+    .pen__body {
+      --nudge: 0px;
+      display: block;
+      width: 100%;
+      height: 100%;
+      border-radius: 999px;
+      transform: translateX(calc(var(--nudge) * -1));
+      transition: transform 260ms cubic-bezier(0.23, 1, 0.32, 1);
+    }
+
+    .pen__body img {
+      display: block;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      user-select: none;
+      -webkit-user-drag: none;
+      filter: drop-shadow(0 1px 1.5px rgb(0 0 0 / 0.14));
+    }
+
+    @media (hover: hover) and (pointer: fine) {
+      .pen:hover .pen__body { --nudge: var(--pen-hover); }
+    }
+    .pen:focus-visible .pen__body { --nudge: var(--pen-hover); }
+    .pen:active .pen__body { --nudge: calc(var(--pen-hover) + 6px); }
+    /* After hover/active so the chosen pen never slides back on press. */
+    .pen[aria-pressed="true"] .pen__body { --nudge: var(--pen-selected); }
+
+    .pen:focus-visible .pen__body {
+      outline: 2px solid #FFFFFF;
+      outline-offset: 2px;
+    }
+
+    @media (max-width: 1199.98px) {
+      .pen-rack {
+        --pen-h: 20px;
+        --pen-peek: 46px;
+        --pen-hover: 8px;
+        --pen-selected: 20px;
+        --pen-gap: 12px;
+      }
+    }
+
+    /*
+     * No room beside the book (phones, portrait tablets): the same rack turned
+     * a quarter, so the pens rise from the bottom edge pointing up and every
+     * slide/nudge above becomes vertical. Black stays leftmost.
+     */
+    .pen-rack.is-bottom {
+      top: auto;
+      right: auto;
+      bottom: 0;
+      left: calc(50% - (7 * var(--pen-h) + 6 * var(--pen-gap)) / 2 - var(--pen-peek));
+      flex-direction: column-reverse;
+      transform: rotate(90deg);
+      transform-origin: 100% 100%;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .pen,
+      .pen-rack.is-visible .pen {
+        transform: none;
+        opacity: 0;
+        transition: opacity 150ms ease;
+      }
+      .pen-rack.is-visible .pen { opacity: 1; }
+      .pen-rack { transition: visibility 0s linear 150ms; }
+      .pen__body { transition-duration: 0.01ms; }
+    }
+
+    /* ── Ink picker variants ──────────────────────────────────
+     * body[data-pen-ui] picks how ink is chosen (switched from the menu in the
+     * lower left):
+     *   rack  pens peeking in from the right edge (above)
+     *   tile  one pen in a tile left of the message field; hover it for swatches
+     *   bar   the same rack, held inside a bar on the right
+     */
+    :root {
+      --pe-ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+      --pe-ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+    }
+
+    body[data-pen-ui="tile"] .pen-rack { display: none; }
+
+    /* ── tile: pen tile + swatches ── */
+    .pen-picker { display: none; }
+
+    body[data-pen-ui="tile"] .message-dock {
+      /* Square, and as tall as the resting message row. */
+      --tile-w: 42pt;
+      --tile-gap: 12px;
+      width: min(calc(480pt + var(--tile-w) + var(--tile-gap)), 92vw);
+    }
+
+    body[data-pen-ui="tile"] .message-pill {
+      left: calc(var(--tile-w) + var(--tile-gap));
+      width: calc(100% - var(--tile-w) - var(--tile-gap));
+    }
+
+    body[data-pen-ui="tile"] .message-error {
+      margin-left: calc(var(--tile-w) + var(--tile-gap) + 4px);
+    }
+
+    /* Tile and bar: placeholders take a light wash of the chosen ink (typed
+       text already uses it everywhere). Black lands on the original #A3A3A3. */
+    body[data-pen-ui="tile"] .message-mirror.is-empty .message-mirror-text,
+    body[data-pen-ui="bar"] .message-mirror.is-empty .message-mirror-text {
+      color: color-mix(in srgb, var(--ink, #1C1C1C) 38%, #F4F4F4);
+      transition: color 200ms ease;
+    }
+    /* Idle send plane too: a faint wash of the ink (black lands near the
+       original #DDDDDD). */
+    body[data-pen-ui="tile"] .message-send:not(.is-ready),
+    body[data-pen-ui="bar"] .message-send:not(.is-ready) {
+      color: color-mix(in srgb, var(--ink, #1C1C1C) 14%, #F4F4F4);
+    }
+    body[data-pen-ui="tile"] #name-input::placeholder,
+    body[data-pen-ui="tile"] .name-native::placeholder,
+    body[data-pen-ui="bar"] #name-input::placeholder,
+    body[data-pen-ui="bar"] .name-native::placeholder {
+      color: color-mix(in srgb, var(--ink, #1C1C1C) 38%, #F4F4F4);
+    }
+
+    body[data-pen-ui="tile"] .pen-picker {
+      display: block;
+      position: absolute;
+      top: 0;
+      left: 0;
+      z-index: 2;
+      width: var(--tile-w);
+      height: var(--tile-w);
+      --swatch: calc(var(--tile-w) * 0.27);
+    }
+
+    /* Bridges the gaps between tile and swatches so the pointer can travel
+       across them without the picker closing. layoutSwatches() sizes it to
+       whichever dot layout is showing. */
+    .pen-picker.is-open::before {
+      content: '';
+      position: absolute;
+      left: var(--bridge-l, -12px);
+      top: var(--bridge-t, -12px);
+      right: var(--bridge-r, -12px);
+      bottom: var(--bridge-b, -12px);
+    }
+
+    .pen-picker__tile {
+      position: relative;
+      display: block;
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      padding: 0;
+      border: 0;
+      border-radius: 16px;
+      overflow: hidden;
+      background: #F4F4F4;
+      --well-inset: calc(var(--tile-w) * 0.068);
+      appearance: none;
+      cursor: pointer;
+      outline: none;
+      -webkit-tap-highlight-color: transparent;
+      transition: transform 160ms var(--pe-ease-out);
+    }
+
+    /* Hover / open: a tinted inner well, inset from the tile's edge (Figma).
+       The frame itself stays #F4F4F4; the pen stands in front of the well. */
+    .pen-picker__tile::before {
+      content: '';
+      position: absolute;
+      inset: var(--well-inset);
+      border-radius: calc(16px - var(--well-inset));
+      background: color-mix(in srgb, var(--ink, #1C1C1C) 10%, #F4F4F4);
+      opacity: 0;
+      transform: scale(0.94);
+      transition:
+        opacity 150ms ease,
+        transform 200ms var(--pe-ease-out),
+        background-color 200ms ease;
+    }
+
+    .pen-picker.is-open .pen-picker__tile::before {
+      opacity: 1;
+      transform: none;
+    }
+
+    @media (hover: hover) and (pointer: fine) {
+      .pen-picker__tile:hover::before {
+        opacity: 1;
+        transform: none;
+      }
+    }
+
+    .pen-picker__tile:active { transform: scale(0.96); }
+
+    .pen-picker__tile:focus-visible {
+      box-shadow: 0 0 0 2px #FFFFFF;
+    }
+
+    /* Pen stands up out of the tile's bottom edge: tip, collar and a little
+       barrel. Two layers so the hover lift and the colour swap never fight:
+         .pen-picker__pen  lift on hover / open
+         .pen-picker__ink  one per ink; a swap crossfades a new layer in (WAAPI) */
+    .pen-picker__pen {
+      --pen-t: calc(var(--tile-w) * 0.26);
+      position: absolute;
+      top: 29%;
+      left: calc(50% - var(--pen-t) / 2);
+      width: var(--pen-t);
+      height: calc(var(--pen-t) * 640 / 78);
+      pointer-events: none;
+      transition: transform 260ms var(--pe-ease-out);
+    }
+
+    .pen-picker.is-open .pen-picker__pen { transform: translateY(-3px); }
+
+    @media (hover: hover) and (pointer: fine) {
+      .pen-picker__tile:hover .pen-picker__pen { transform: translateY(-3px); }
+    }
+
+    .pen-picker__ink {
+      position: absolute;
+      inset: 0;
+    }
+
+    .pen-picker__ink img {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: calc(var(--pen-t) * 640 / 78);
+      height: var(--pen-t);
+      /* Pen art points left; a quarter turn stands the tip up. */
+      transform: translate(-50%, -50%) rotate(90deg);
+      user-select: none;
+      -webkit-user-drag: none;
+      filter: drop-shadow(1px 0 1.5px rgb(0 0 0 / 0.14));
+    }
+
+    /* Swatches wrap the tile's bottom-left corner. Each one starts tucked
+       toward the tile (--x/--y are fractions of the tile), so they grow out of
+       the pen rather than out of nowhere. */
+    .pen-picker__swatches {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+    }
+
+    .pen-picker__swatch {
+      --x: var(--wx);
+      --y: var(--wy);
+      position: absolute;
+      top: calc(var(--tile-w) * var(--y) - var(--swatch) / 2);
+      left: calc(var(--tile-w) * var(--x) - var(--swatch) / 2);
+      width: var(--swatch);
+      height: var(--swatch);
+      margin: 0;
+      padding: 0;
+      border: 0;
+      border-radius: 50%;
+      background: var(--swatch-c);
+      appearance: none;
+      cursor: pointer;
+      outline: none;
+      -webkit-tap-highlight-color: transparent;
+      /* Faint rim so the black swatch still reads on the dark backdrop. */
+      box-shadow:
+        0 0 0 0 #FFFFFF,
+        inset 0 0 0 1px rgb(255 255 255 / 0.16),
+        0 1px 2px rgb(0 0 0 / 0.2);
+      opacity: 0;
+      pointer-events: none;
+      /* Resting a quarter of the way in toward the tile, slightly shrunk:
+         enough to read as growing out of the pen, small enough that the dots
+         drift into place instead of shooting out. */
+      transform:
+        translate(
+          calc((0.5 - var(--x)) * var(--tile-w) * var(--pull, 0.25)),
+          calc((0.5 - var(--y)) * var(--tile-w) * var(--pull, 0.25))
+        )
+        scale(0.8);
+      /* Exit: faster than the enter, tucking back in the reverse order
+         (purple first, black last) so the fan folds rather than blinks out. */
+      transition:
+        opacity 160ms ease calc((5 - var(--i)) * 12ms),
+        transform 200ms var(--pe-ease-out) calc((5 - var(--i)) * 12ms),
+        box-shadow 160ms ease;
+    }
+
+    .pen-picker.is-open .pen-picker__swatch {
+      opacity: 1;
+      pointer-events: auto;
+      transform: none;
+      /* Enter: staggered round the corner, black first, on the softer
+         drawer curve so each dot glides the last few pixels. */
+      transition:
+        opacity 200ms ease calc(var(--i) * 24ms),
+        transform 300ms cubic-bezier(0.32, 0.72, 0, 1) calc(var(--i) * 24ms),
+        box-shadow 160ms ease;
+    }
+
+    /* Toggled again mid-motion (pointer slips out and back in): retarget
+       straight away. A stagger delay here would freeze each dot where it is
+       before it turns round. */
+    .pen-picker.is-quick .pen-picker__swatch {
+      transition-delay: 0ms !important;
+    }
+
+    .pen-picker__swatch[aria-pressed="true"] {
+      box-shadow:
+        0 0 0 2px #FFFFFF,
+        inset 0 0 0 1px rgb(255 255 255 / 0),
+        0 1px 3px 2px rgb(0 0 0 / 0.18);
+    }
+
+    @media (hover: hover) and (pointer: fine) {
+      .pen-picker.is-open .pen-picker__swatch:hover {
+        transform: scale(1.14);
+        transition:
+          opacity 180ms ease,
+          transform 160ms var(--pe-ease-out),
+          box-shadow 160ms ease;
+      }
+    }
+
+    .pen-picker.is-open .pen-picker__swatch:active {
+      transform: scale(0.92);
+      transition:
+        transform 100ms var(--pe-ease-out),
+        box-shadow 160ms ease;
+    }
+
+    .pen-picker__swatch:focus-visible {
+      box-shadow:
+        0 0 0 2px #FFFFFF,
+        0 0 0 4px rgb(255 255 255 / 0.4);
+    }
+
+    @media (max-width: 1199.98px) {
+      body[data-pen-ui="tile"] .message-dock { --tile-w: 48px; }
+      .pen-picker__tile { border-radius: 12px; }
+      .pen-picker__tile::before { border-radius: calc(12px - var(--well-inset)); }
+    }
+
+    @media (min-height: 1400px) {
+      body[data-pen-ui="tile"] .message-dock { --tile-w: 64pt; }
+    }
+
+    /* Tray layout: the dots stand in a pill that rises out of the tile, same
+       fill and corner as the tile. It grows up from the tile (origin-aware)
+       and the dots follow, nearest first. */
+    .pen-picker__tray {
+      display: none;
+      position: absolute;
+      left: 0;
+      bottom: calc(100% + var(--tray-gap, 8px));
+      width: var(--tile-w);
+      height: var(--tray-h, 160px);
+      border-radius: 16px;
+      background: #F4F4F4;
+      box-shadow: 0 8px 24px rgb(0 0 0 / 0.18);
+      transform-origin: bottom center;
+      opacity: 0;
+      transform: translateY(6px) scale(0.92);
+      transition:
+        opacity 140ms ease 60ms,
+        transform 180ms var(--pe-ease-out) 60ms;
+    }
+
+    body[data-swatch-layout="tray"] .pen-picker__tray { display: block; }
+
+    .pen-picker.is-open .pen-picker__tray {
+      opacity: 1;
+      transform: none;
+      transition:
+        opacity 160ms ease,
+        transform 260ms cubic-bezier(0.32, 0.72, 0, 1);
+    }
+
+    .pen-picker.is-quick .pen-picker__tray { transition-delay: 0ms; }
+
+    @media (max-width: 1199.98px) {
+      .pen-picker__tray { border-radius: 12px; }
+    }
+
+    /* A white ring vanishes on the light tray: ring in the dot's own colour,
+       with a tray-coloured gap. */
+    body[data-swatch-layout="tray"] .pen-picker__swatch[aria-pressed="true"] {
+      box-shadow:
+        0 0 0 2px #F4F4F4,
+        inset 0 0 0 1px rgb(255 255 255 / 0),
+        0 0 0 3.5px var(--swatch-c);
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .pen-picker__tray,
+      .pen-picker.is-open .pen-picker__tray { transform: none; }
+      .pen-picker__swatch,
+      .pen-picker.is-open .pen-picker__swatch {
+        transform: none;
+        transition: opacity 150ms ease, box-shadow 150ms ease;
+      }
+      .pen-picker__pen,
+      .pen-picker.is-open .pen-picker__pen { transform: none; }
+    }
+
+    /* ── bar: the rack, contained ──
+     * Same pens, sizes and nudges as the rack. The bar clips the barrels, so
+     * pens slide in and out of its right edge, and the bar itself floats in
+     * from the right. */
+    body[data-pen-ui="bar"] .pen-rack {
+      /* Tighter than the rack: tip and collar show, the chosen pen only
+         leans out a little, and the bar hugs that. */
+      --pen-peek: 50px;
+      --pen-hover: 5px;
+      --pen-selected: 12px;
+      --bar-pad-y: 14px;
+      --bar-pad-l: 8px;
+      --bar-inset: 16px;
+      --bar-w: calc(var(--pen-peek) + var(--pen-selected) + var(--bar-pad-l));
+      right: var(--bar-inset);
+      box-sizing: border-box;
+      width: var(--bar-w);
+      padding: var(--bar-pad-y) 0;
+      /* Same corner as the message field. Clear glass: the fill is a light
+         white wash (and a small sheen top-left) over a light blur, so what's
+         behind shows through. The edges do the work of making the bar
+         apparent: a crisp white rim, a bright top lip, a glint along
+         the bottom, and a dark hairline outside so it holds its shape on
+         light backgrounds too. */
+      border-radius: 16px;
+      background:
+        radial-gradient(110% 50% at 15% 0%, rgb(255 255 255 / 0.16) 0%, rgb(255 255 255 / 0) 65%),
+        linear-gradient(180deg, rgb(255 255 255 / 0.14) 0%, rgb(255 255 255 / 0.08) 100%);
+      backdrop-filter: blur(6px) saturate(1.8);
+      -webkit-backdrop-filter: blur(6px) saturate(1.8);
+      box-shadow:
+        inset 0 0 0 1px rgb(255 255 255 / 0.38),
+        inset 0 1.5px 0 rgb(255 255 255 / 0.7),
+        inset 0 -1px 0 rgb(255 255 255 / 0.22),
+        0 0 0 0.5px rgb(0 0 0 / 0.12),
+        0 6px 20px rgb(0 0 0 / 0.10);
+      overflow: hidden;
+      opacity: 0;
+      translate: 16px 0;
+      transition:
+        opacity 180ms ease 60ms,
+        translate 240ms var(--pen-exit-ease) 60ms,
+        visibility 0s linear 300ms;
+    }
+
+    /* No backdrop blur available: fall back to a near-solid fill. */
+    @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+      body[data-pen-ui="bar"] .pen-rack { background: rgb(244 244 244 / 0.92); }
+    }
+
+    body[data-pen-ui="bar"] .pen-rack.is-visible {
+      opacity: 1;
+      translate: 0 0;
+      transition:
+        opacity 220ms ease,
+        translate 420ms var(--pen-enter-ease),
+        visibility 0s,
+        bottom 280ms cubic-bezier(0.32, 0.72, 0, 1);
+    }
+
+    /* No room beside the book: the bar turns a quarter like the rack and sits
+       on the bottom edge as a tray, rounded only on the side facing up. */
+    body[data-pen-ui="bar"] .pen-rack.is-bottom {
+      --bar-pad-l: 6px;
+      right: auto;
+      bottom: 0;
+      border-radius: 16px 0 0 16px;
+      left: calc(50% - (7 * var(--pen-h) + 6 * var(--pen-gap) + 2 * var(--bar-pad-y)) / 2 - var(--bar-w));
+      translate: 0 16px;
+    }
+
+    body[data-pen-ui="bar"] .pen-rack.is-bottom.is-visible { translate: 0 0; }
+
+    @media (max-width: 1199.98px) {
+      body[data-pen-ui="bar"] .pen-rack {
+        --pen-peek: 42px;
+        --pen-hover: 4px;
+        --pen-selected: 10px;
+        border-radius: 12px;
+      }
+      body[data-pen-ui="bar"] .pen-rack.is-bottom { border-radius: 12px 0 0 12px; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      body[data-pen-ui="bar"] .pen-rack,
+      body[data-pen-ui="bar"] .pen-rack.is-visible,
+      body[data-pen-ui="bar"] .pen-rack.is-bottom { translate: 0 0; }
+    }
+
+    /* Switching variants: drop the old one without its exit. */
+    .pen-rack.is-instant,
+    .pen-rack.is-instant .pen { transition: none !important; }
+
+    /* ── Close (top right of the viewport) ──
+     * Same corner close as the Other Designs preview (.od-preview__close in
+     * globals.css), but its disc is the Bar ink picker's glass: a light white
+     * wash and corner sheen over a small blur, white rim, bright top lip and a
+     * dark hairline. Fades in with the message dock, out faster than it came. */
+    .book-close {
+      position: fixed;
+      top: 18px;
+      right: 18px;
+      z-index: 6;
+      display: grid;
+      place-items: center;
+      width: 36px;
+      height: 36px;
+      margin: 0;
+      padding: 0;
+      border: 0;
+      border-radius: 50%;
+      background:
+        radial-gradient(110% 50% at 15% 0%, rgb(255 255 255 / 0.16) 0%, rgb(255 255 255 / 0) 65%),
+        linear-gradient(180deg, rgb(255 255 255 / 0.14) 0%, rgb(255 255 255 / 0.08) 100%);
+      backdrop-filter: blur(6px) saturate(1.8);
+      -webkit-backdrop-filter: blur(6px) saturate(1.8);
+      box-shadow:
+        inset 0 0 0 1px rgb(255 255 255 / 0.38),
+        inset 0 1.5px 0 rgb(255 255 255 / 0.7),
+        inset 0 -1px 0 rgb(255 255 255 / 0.22),
+        0 0 0 0.5px rgb(0 0 0 / 0.12),
+        0 6px 20px rgb(0 0 0 / 0.10);
+      /* The backdrop is only a blur of the page, so the X follows the page's
+         theme: dark over the light page, white at night (body.host-dark). */
+      color: #1C1C1C;
+      appearance: none;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+      transition:
+        opacity 80ms ease-out,
+        scale 120ms ease,
+        visibility 0s linear 80ms;
+    }
+
+    /* 48px hit area around the 36px disc. */
+    .book-close::before {
+      content: '';
+      position: absolute;
+      inset: -6px;
+    }
+
+    .book-close.is-visible {
+      opacity: 1;
+      visibility: visible;
+      pointer-events: auto;
+      transition:
+        opacity 200ms ease,
+        scale 120ms ease,
+        visibility 0s;
+    }
+
+    body.host-dark .book-close { color: #FFFFFF; }
+
+    body.is-docked .book-close {
+      opacity: 0 !important;
+      visibility: hidden !important;
+    }
+
+    @media (hover: hover) and (pointer: fine) {
+      /* A touch more frost under the pointer. */
+      .book-close:hover {
+        background:
+          radial-gradient(110% 50% at 15% 0%, rgb(255 255 255 / 0.22) 0%, rgb(255 255 255 / 0) 65%),
+          linear-gradient(180deg, rgb(255 255 255 / 0.24) 0%, rgb(255 255 255 / 0.16) 100%);
+      }
+    }
+
+    .book-close:active { scale: 0.94; }
+
+    .book-close:focus-visible {
+      outline: 2px solid #000;
+      outline-offset: 3px;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .book-close,
+      .book-close.is-visible { transition: none; }
+    }
+
+    /* ── Variant menu (lower left) ── */
+    .pen-ui-menu {
+      position: fixed;
+      left: 16px;
+      bottom: 16px;
+      z-index: 6;
+      font-family: 'Switzer', sans-serif;
+      letter-spacing: -0.01em;
+      opacity: 0;
+      visibility: hidden;
+      translate: 0 6px;
+      transition:
+        opacity 150ms ease,
+        translate 150ms var(--pe-ease-out),
+        visibility 0s linear 150ms;
+    }
+
+    .pen-ui-menu.is-visible {
+      opacity: 1;
+      visibility: visible;
+      translate: 0 0;
+      transition:
+        opacity 240ms ease,
+        translate 300ms var(--pe-ease-out),
+        visibility 0s;
+    }
+
+    body.is-docked .pen-ui-menu {
+      opacity: 0 !important;
+      visibility: hidden !important;
+    }
+
+    .pen-ui-menu__trigger {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      height: 36px;
+      margin: 0;
+      padding: 0 10px 0 14px;
+      border: 0;
+      border-radius: 12px;
+      background: #F4F4F4;
+      color: #1C1C1C;
+      font: inherit;
+      font-size: 13px;
+      font-weight: 500;
+      line-height: 1;
+      appearance: none;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+      transition:
+        transform 160ms var(--pe-ease-out),
+        background-color 150ms ease;
+    }
+
+    @media (hover: hover) and (pointer: fine) {
+      .pen-ui-menu__trigger:hover { background: #FFFFFF; }
+    }
+
+    .pen-ui-menu__trigger:active { transform: scale(0.97); }
+
+    .pen-ui-menu__trigger:focus-visible {
+      outline: 2px solid #FFFFFF;
+      outline-offset: 2px;
+    }
+
+    .pen-ui-menu__label { color: #8A8A8A; font-weight: 400; }
+
+    .pen-ui-menu__chevron {
+      width: 14px;
+      height: 14px;
+      color: #8A8A8A;
+      transition: transform 200ms var(--pe-ease-out);
+    }
+
+    .pen-ui-menu.is-open .pen-ui-menu__chevron { transform: rotate(180deg); }
+
+    .pen-ui-menu__list {
+      position: absolute;
+      left: 0;
+      bottom: calc(100% + 8px);
+      box-sizing: border-box;
+      width: 248px;
+      padding: 6px;
+      border-radius: 14px;
+      background: #F4F4F4;
+      box-shadow:
+        0 12px 32px rgb(0 0 0 / 0.22),
+        0 1px 2px rgb(0 0 0 / 0.08);
+      /* Grows out of the trigger. */
+      transform-origin: bottom left;
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+      transform: translateY(4px) scale(0.96);
+      transition:
+        opacity 120ms ease,
+        transform 120ms var(--pe-ease-out),
+        visibility 0s linear 120ms;
+    }
+
+    .pen-ui-menu.is-open .pen-ui-menu__list {
+      opacity: 1;
+      visibility: visible;
+      pointer-events: auto;
+      transform: none;
+      transition:
+        opacity 180ms ease,
+        transform 220ms var(--pe-ease-out),
+        visibility 0s;
+    }
+
+    .pen-ui-menu__item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      width: 100%;
+      margin: 0;
+      padding: 8px 10px 8px 8px;
+      border: 0;
+      border-radius: 9px;
+      background: transparent;
+      color: #1C1C1C;
+      font: inherit;
+      text-align: left;
+      appearance: none;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+      transition:
+        background-color 120ms ease,
+        transform 160ms var(--pe-ease-out);
+    }
+
+    @media (hover: hover) and (pointer: fine) {
+      .pen-ui-menu__item:not(:disabled):hover { background: #E8E8E8; }
+    }
+
+    .pen-ui-menu__item:not(:disabled):active { transform: scale(0.98); }
+
+    .pen-ui-menu__item:focus-visible {
+      outline: 2px solid #1C1C1C;
+      outline-offset: -2px;
+    }
+
+    .pen-ui-menu__item:disabled { cursor: default; opacity: 0.45; }
+
+    .pen-ui-menu__num {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      flex: 0 0 auto;
+      width: 22px;
+      height: 22px;
+      border-radius: 7px;
+      background: #E4E4E4;
+      color: #6E6E73;
+      font-size: 12px;
+      font-weight: 500;
+      transition: background-color 150ms ease, color 150ms ease;
+    }
+
+    .pen-ui-menu__item[aria-checked="true"] .pen-ui-menu__num {
+      background: #1C1C1C;
+      color: #FFFFFF;
+    }
+
+    .pen-ui-menu__text {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      min-width: 0;
+    }
+
+    .pen-ui-menu__name { font-size: 13px; font-weight: 500; line-height: 1.2; }
+    .pen-ui-menu__note { font-size: 12px; color: #8A8A8A; line-height: 1.25; }
+
+    /* Second group, only while Swatches is active: how the dots are laid out. */
+    .pen-ui-menu__sub {
+      margin: 6px 2px 0;
+      padding-top: 6px;
+      border-top: 1px solid rgb(0 0 0 / 0.08);
+    }
+
+    body:not([data-pen-ui="tile"]) .pen-ui-menu__sub { display: none; }
+
+    .pen-ui-menu__heading {
+      margin: 2px 8px 4px;
+      color: #8A8A8A;
+      font-size: 11px;
+      font-weight: 500;
+      letter-spacing: 0.02em;
+      text-transform: uppercase;
+    }
+
+    .pen-ui-menu__num--sub {
+      font-size: 11px;
+    }
+
+    /* Phones: the bottom edge belongs to the pens (and the keyboard), so the
+       switcher moves to the free top-left corner and its list drops down. */
+    @media (max-width: 640px) {
+      .pen-ui-menu { left: 12px; top: 12px; bottom: auto; translate: 0 -6px; }
+      .pen-ui-menu.is-visible { translate: 0 0; }
+      .pen-ui-menu__list {
+        top: calc(100% + 8px);
+        bottom: auto;
+        transform-origin: top left;
+        transform: translateY(-4px) scale(0.96);
+        max-height: calc(100vh - 80px);
+        overflow-y: auto;
+      }
+      .pen-ui-menu__chevron { transform: rotate(180deg); }
+      .pen-ui-menu.is-open .pen-ui-menu__chevron { transform: none; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .pen-ui-menu,
+      .pen-ui-menu.is-visible { translate: 0 0; }
+      .pen-ui-menu__list,
+      .pen-ui-menu.is-open .pen-ui-menu__list { transform: none; }
+    }
+
     .page-crease { position: absolute; top: 0; bottom: 0; width: 34px; pointer-events: none; z-index: 20; }
     .page-crease.left  { left: 0;  background: linear-gradient(to right, rgba(0,0,0,0.05), transparent); }
     .page-crease.right { right: 0; background: linear-gradient(to left,  rgba(0,0,0,0.05), transparent); }
@@ -1439,13 +2501,10 @@
 
     /* Tall viewports: larger default input field */
     @media (min-height: 1400px) {
-      .message-dock-slot {
-        height: 64pt;
-      }
-
+      .message-dock-slot,
       .message-row {
-        height: 64pt;
-        min-height: 64pt;
+        height: max(64pt, calc(var(--message-size) * 1.15 + 18px));
+        min-height: max(64pt, calc(var(--message-size) * 1.15 + 18px));
       }
     }
 
@@ -1500,11 +2559,12 @@
 
       .message-pill { border-radius: 12px; }
 
-      /* 42pt (56px) is too tall for the dock before the name row opens. */
-      .message-dock,
+      /* Resting row stays short. A short message steps up to display type,
+         and the row grows with it instead of clipping the line. */
+      .message-dock-slot,
       .message-row {
-        height: 48px;
-        min-height: 48px;
+        height: max(48px, calc(var(--message-size) * 1.15 + 18px));
+        min-height: max(48px, calc(var(--message-size) * 1.15 + 18px));
       }
 
       /* Tighter name row once the name field opens: 0 -> 4px top and bottom. */
@@ -1554,7 +2614,22 @@ html:has(body.is-embed) {
 }
 
 #stage {
-  transition: transform var(--modal-enter) var(--modal-ease);
+  /* translate / scale are the phone-keyboard fit (fitAboveKeyboard in JS). */
+  transition:
+    transform var(--modal-enter) var(--modal-ease),
+    translate 280ms cubic-bezier(0.32, 0.72, 0, 1),
+    scale 280ms cubic-bezier(0.32, 0.72, 0, 1);
+  transform-origin: center center;
+}
+
+/* The message field rides up with the phone keyboard, on the same curve. */
+.message-dock-slot {
+  transition: translate 280ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #stage,
+  .message-dock-slot { transition-duration: 0.01ms; }
 }
 body.is-docked {
   /* Closed cover's outer corners — top-right and bottom-right; the spine side is
@@ -1587,7 +2662,7 @@ body.is-docked #notebook-paint-warm {
  */
 body.is-closing-home #frost {
   opacity: 0;
-  transition: opacity 380ms var(--modal-ease);
+  transition: opacity 300ms cubic-bezier(0.23, 1, 0.32, 1);
 }
 
 /* Docked, the book sits square to the page: the in-plane rotate(5deg) lean and
@@ -1739,26 +2814,14 @@ body.is-docked .book-wrap.is-closed .book:not(:hover):not(:focus-visible):not(.i
 
   <!-- Figma message input — visible after 50% of frost enter -->
   <div id="message-dock" class="message-dock" aria-hidden="true">
-    <p class="page-turn-hint page-turn-hint--desktop">
-      <span>Turn pages by pressing</span>
-      <button type="button" class="page-turn-hint__key" data-flip="prev" aria-label="Previous page">
-        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-          <path d="M15 6 9 12l6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
-      </button>
-      <span>or</span>
-      <button type="button" class="page-turn-hint__key" data-flip="next" aria-label="Next page">
-        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-          <path d="m9 6 6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
-      </button>
-      <span>key, press</span>
-      <button type="button" class="page-turn-hint__key page-turn-hint__key--text" data-close aria-label="Close guestbook">esc</button>
-      <span>to exit</span>
-    </p>
-    <!-- Touch (phone / tablet): no keyboard, so no key caps — just how to close. -->
-    <p class="page-turn-hint page-turn-hint--touch">Tap an empty area to close</p>
     <div class="message-dock-slot">
+      <!-- Ink picker, "tile" variant: pen tile + swatches; built from PEN_INKS -->
+      <div id="pen-picker" class="pen-picker">
+        <button type="button" class="pen-picker__tile" aria-label="Ink color" aria-expanded="false" aria-controls="pen-picker-swatches">
+          <span class="pen-picker__pen"><span class="pen-picker__ink"><img src="pens/pen-black.webp" alt="" width="640" height="78" draggable="false" decoding="async"></span></span>
+        </button>
+        <div id="pen-picker-swatches" class="pen-picker__swatches" role="group" aria-label="Ink color"></div>
+      </div>
       <form id="message-form" class="message-pill is-empty" autocomplete="off">
         <div class="message-row">
           <div class="message-field-wrap">
@@ -1816,6 +2879,49 @@ body.is-docked .book-wrap.is-closed .book:not(:hover):not(:focus-visible):not(.i
     </div>
   </div>
 
+  <!-- Pinned 24px above the viewport bottom; shown with the message dock. -->
+  <p class="page-turn-hint page-turn-hint--desktop">
+    <span>Turn pages by pressing</span>
+    <button type="button" class="page-turn-hint__key" data-flip="prev" aria-label="Previous page">
+      <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <path d="M15 6 9 12l6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </button>
+    <span>or</span>
+    <button type="button" class="page-turn-hint__key" data-flip="next" aria-label="Next page">
+      <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <path d="m9 6 6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </button>
+    <span>key, press</span>
+    <button type="button" class="page-turn-hint__key page-turn-hint__key--text" data-close aria-label="Close guestbook">esc</button>
+    <span>to exit</span>
+  </p>
+  <!-- Touch (phone / tablet): no keyboard, so no key caps — just how to close. -->
+  <p class="page-turn-hint page-turn-hint--touch">Tap an empty area to close</p>
+
+  <!-- Ink picker on the right edge; pens are built from PEN_INKS -->
+  <div id="pen-rack" class="pen-rack" role="group" aria-label="Ink color" aria-hidden="true"></div>
+
+  <!-- Top right of the viewport: close the open book -->
+  <button type="button" id="book-close" class="book-close" aria-label="Close guestbook" tabindex="-1">
+    <svg viewBox="0 0 16 16" width="14" height="14" fill="none" aria-hidden="true">
+      <path d="M3.5 3.5l9 9M12.5 3.5l-9 9" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
+    </svg>
+  </button>
+
+  <!-- Lower left: switches between ink picker variants (body[data-pen-ui]) -->
+  <div id="pen-ui-menu" class="pen-ui-menu" aria-hidden="true">
+    <div class="pen-ui-menu__list" role="menu" aria-label="Ink picker style"></div>
+    <button type="button" class="pen-ui-menu__trigger" aria-haspopup="menu" aria-expanded="false" tabindex="-1">
+      <span class="pen-ui-menu__label">Ink</span>
+      <span class="pen-ui-menu__value"></span>
+      <svg class="pen-ui-menu__chevron" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <path d="m6 15 6-6 6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </button>
+  </div>
+
   <!-- Keeps both open-spread halves decoded at display size (offscreen) -->
   <div id="notebook-paint-warm" aria-hidden="true">
     <div class="warm-left"></div>
@@ -1823,6 +2929,25 @@ body.is-docked .book-wrap.is-closed .book:not(:hover):not(:focus-visible):not(.i
   </div>
 
   <script>
+    /* Bottom “Turn pages by pressing…” / “Tap an empty area” hint.
+       Set true to show it again; markup, styles, and key-cap clicks stay. */
+    var SHOW_PAGE_TURN_HINT = true;
+    if (SHOW_PAGE_TURN_HINT) document.body.classList.add('show-page-turn-hint');
+
+    /* Mirror the page's light / night theme (data-theme on the host's <html>)
+       as body.host-dark, for controls that sit over the blurred page. */
+    (function syncHostTheme() {
+      var hostRoot = null;
+      try { hostRoot = window.parent !== window ? window.parent.document.documentElement : null; }
+      catch (_e) { hostRoot = null; }
+      if (!hostRoot) return;
+      var apply = function () {
+        document.body.classList.toggle('host-dark', hostRoot.dataset.theme === 'dark');
+      };
+      apply();
+      new MutationObserver(apply).observe(hostRoot, { attributes: true, attributeFilter: ['data-theme'] });
+    })();
+
     var INNER_SPREADS = 20; // 40 inner pages to flip through
     /** Cover.png is 771×998 — one shared page size for CSS book + PageFlip */
     var PAGE_ASPECT = 998 / 771;
@@ -1840,7 +2965,16 @@ body.is-docked .book-wrap.is-closed .book:not(:hover):not(:focus-visible):not(.i
     // arriving ahead of the book.
     var INPUT_SHOW_DELAY_MS = Math.round(MODAL_ENTER_MS * 0.5) - 50; // 150
     var STORAGE_KEY = (window.GuestbookApi && GuestbookApi.STORAGE_KEY) || 'guestbook_v3';
-    var NOTE_COLORS = ['#1C1C1C', '#2E2E2E', '#3A3A3A', '#252525', '#4A4A4A'];
+    /* Ink = each pen's tip colour, so the note matches the pen that wrote it. */
+    var PEN_INKS = [
+      { id: 'black', label: 'Black', ink: '#1C1C1C' },
+      { id: 'pink', label: 'Pink', ink: '#E6095B' },
+      { id: 'orange', label: 'Orange', ink: '#F34102' },
+      { id: 'green', label: 'Green', ink: '#3C8F02' },
+      { id: 'teal', label: 'Teal', ink: '#038A93' },
+      { id: 'blue', label: 'Blue', ink: '#0142B8' },
+      { id: 'purple', label: 'Purple', ink: '#53109C' }
+    ];
     var messageErrorEl = document.getElementById('message-error');
     // Accented Latin and everyday symbols are kept; only characters the
     // handwriting face cannot draw are dropped. Smart punctuation is folded to
@@ -2047,6 +3181,32 @@ body.is-docked .book-wrap.is-closed .book:not(:hover):not(:focus-visible):not(.i
       );
     }
 
+    /*
+     * Tilt. Every note leans a random amount anywhere between -TILT_MAX and
+     * TILT_MAX degrees (near-straight included), so the page reads
+     * hand-written. The angle comes from the note's id, so a note keeps the
+     * same lean on every load and in every browser, whatever angle older
+     * saves (up to 7deg) recorded.
+     */
+    var TILT_MAX = 5;
+    function tiltFor(key) {
+      var str = String(key || '');
+      var h = 2166136261;
+      for (var i = 0; i < str.length; i++) {
+        h ^= str.charCodeAt(i);
+        h = Math.imul(h, 16777619);
+      }
+      // Avalanche (murmur3 fmix32): ids that differ by one character, like
+      // seed-01 / seed-02, otherwise land on nearly the same angle.
+      h ^= h >>> 16;
+      h = Math.imul(h, 0x85EBCA6B);
+      h ^= h >>> 13;
+      h = Math.imul(h, 0xC2B2AE35);
+      h ^= h >>> 16;
+      var unit = (h >>> 0) / 4294967296;
+      return Math.round((unit * 2 - 1) * TILT_MAX * 10) / 10;
+    }
+
     function applyPlacementToNote(note, placement) {
       note.style.left = placement.xPercent.toFixed(2) + '%';
       note.style.top = placement.yPercent.toFixed(2) + '%';
@@ -2060,29 +3220,150 @@ body.is-docked .book-wrap.is-closed .book:not(:hover):not(:focus-visible):not(.i
       });
     }
 
+    var SMILE_RE =
+      /[:;](?:\s*-?\s*)(?:\)\s*)+|=(?:\s*-?\s*)(?:\)\s*)+|[:;=](?:\s*-?\s*)D+(?![a-z])|\bx-?D+\b|\^\s*[_\-]\s*\^|\(\s*\^\s*_\s*\^\s*\)|[\u263A\u263B]|\uD83D[\uDE00-\uDE0A\uDE42\uDE0B]/gi;
+
+    /** The smile sticker stands in for the emoticon, so the text drops it. */
+    function stripSmileys(message) {
+      return String(message || '')
+        .replace(new RegExp(SMILE_RE.source, 'gi'), ' ')
+        .replace(/\s{2,}/g, ' ')
+        .replace(/\s+([.,!?])/g, '$1')
+        .trim();
+    }
+
+    /**
+     * Smileys, love/like, sunglasses/cool, fire/lit, and wow/amazing, in the
+     * order they appear.
+     */
+    function stickerKindsForMessage(message) {
+      var text = String(message || '');
+      var smileRe = new RegExp(SMILE_RE.source, 'gi');
+      var heartRe =
+        /\b(?:love|loves|loved|loving|like|likes|liked|liking)\b/gi;
+      // "cool" in any stretch (cooool, coolll) plus cooler / coolest.
+      var sunRe = /\bsunglass(?:es)?\b|\bco{2,}l+(?:er|est)?\b/gi;
+      var fireRe = /\b(?:fires|flames|flame|fire+|lit+)\b|\uD83D\uDD25/gi;
+      var smile = smileRe.exec(text);
+      var heart = heartRe.exec(text);
+      var sun = sunRe.exec(text);
+      // "wow" in any stretch (woow, wowww), amazing / amazed / amaze, and ✨.
+      var sparkleRe = /\bwo+w+\b|\bamaz(?:e|ed|es|ing|ingly)\b|\u2728/gi;
+      var fire = fireRe.exec(text);
+      var sparkle = sparkleRe.exec(text);
+      var hits = [];
+      if (sparkle) hits.push({ i: sparkle.index, kind: 'sparkle' });
+      if (smile) hits.push({ i: smile.index, kind: 'happy' });
+      if (heart) hits.push({ i: heart.index, kind: 'heart' });
+      if (sun) hits.push({ i: sun.index, kind: 'sunglasses' });
+      if (fire) hits.push({ i: fire.index, kind: 'fire' });
+      hits.sort(function (a, b) { return a.i - b.i; });
+      return hits.map(function (hit) { return hit.kind; });
+    }
+
+    /*
+     * em per Figma px, so stickers follow the message size: the heart lands at
+     * about the height of an "l" in Ugly Dave. Keep in step with the fire frame
+     * in .entry-sticker--fire.
+     */
+    var STICKER_SCALE = 0.04;
+    /* Bump when the sticker SVGs change so cached masks are not reused. */
+    var STICKER_V = '?v=4';
+
+    /* Degrees; positive leans right. Hearts only lean right of upright. */
+    var STICKER_TILT = { min: -30, max: 30 };
+    var STICKER_TILT_BY_KIND = { heart: { min: 0, max: 30 } };
+
+    /*
+     * Seeded by note id + sticker slot so a note's stickers keep the same pose
+     * every time the book re-renders.
+     */
+    function stickerTilt(seed, kind) {
+      var range = STICKER_TILT_BY_KIND[kind] || STICKER_TILT;
+      var h = 2166136261;
+      for (var i = 0; i < seed.length; i++) {
+        h ^= seed.charCodeAt(i);
+        h = Math.imul(h, 16777619);
+      }
+      var unit = (h >>> 0) / 4294967295;
+      return Math.round(range.min + unit * (range.max - range.min));
+    }
+
+    /* A mask filled with currentColor, so the sticker takes the note's ink. */
+    function stickerInk(file, w, h, cls, tilt) {
+      return (
+        '<span class="entry-sticker-ink' + (cls ? ' ' + cls : '') + '" style="' +
+        'width:' + (w * STICKER_SCALE).toFixed(4) + 'em;' +
+        'height:' + (h * STICKER_SCALE).toFixed(4) + 'em;' +
+        (tilt ? 'transform:rotate(' + tilt + 'deg);' : '') +
+        '-webkit-mask-image:url(stickers/' + file + STICKER_V + ');mask-image:url(stickers/' + file + STICKER_V + ')' +
+        '"></span>'
+      );
+    }
+
+    function stickerMarkup(kind, tilt) {
+      if (kind === 'heart') {
+        return stickerInk('heart.svg', 19.661, 21.6266, 'entry-sticker', tilt);
+      }
+      if (kind === 'sparkle') {
+        return stickerInk('sparkle.svg', 15.3962, 17.4882, 'entry-sticker', tilt);
+      }
+      if (kind === 'sunglasses') {
+        return stickerInk('sunglasses.svg', 22.774, 9.963, 'entry-sticker', tilt);
+      }
+      if (kind === 'fire') {
+        // Tilt the frame, not its parts, so the core stays inside the flame.
+        return (
+          '<span class="entry-sticker entry-sticker--fire"' +
+          (tilt ? ' style="transform:rotate(' + tilt + 'deg)"' : '') + '>' +
+          stickerInk('fire-outer.svg', 15.4521, 19.9084) +
+          stickerInk('fire-inner.svg', 8.0165, 10.4571, 'entry-sticker__fire-core') +
+          '</span>'
+        );
+      }
+      return stickerInk('happy.svg', 17.5025, 17.3666, 'entry-sticker', tilt);
+    }
+
     function createScatterNote(entry) {
       var note = document.createElement('div');
       note.className = 'scatter-note';
       note.dataset.entryId = entry.id || '';
       var vibe = entry.vibe || {};
-      var rotation =
-        typeof vibe.rotation === 'number' ? vibe.rotation : 0;
+      var rotation = tiltFor(entry.id || entry.message);
       note.dataset.rotation = String(rotation);
       if (vibe.top) note.style.top = vibe.top;
       if (vibe.left) note.style.left = vibe.left;
       note.style.transform = 'rotate(' + rotation + 'deg)';
       note.style.fontFamily = "'Ugly Dave', cursive, sans-serif";
-      /* Always black/gray ink — ignore any stored chromatic vibe.color. */
-      note.style.color = '#1C1C1C';
+      /* Only pen inks are honoured; older notes stored random grays. */
+      note.style.color = penForInk(vibe.color) ? vibe.color : '#1C1C1C';
       var displayName =
         entry.name && entry.name !== '—' ? entry.name : 'Anonymous';
       var metaParts = [escapeHtml(displayName)];
       if (entry.date) metaParts.push(escapeHtml(entry.date));
       var metaHtml =
         '<span class="entry-meta">' + metaParts.join(' ') + '</span>';
+      var kinds = stickerKindsForMessage(entry.message);
+      var messageText = kinds.indexOf('happy') !== -1
+        ? stripSmileys(entry.message)
+        : entry.message;
+      var words = String(messageText || '').split(/\s+/).filter(Boolean).length;
+      note.dataset.size = words < 4 ? 'lg' : words <= 12 ? 'md' : 'sm';
+      var stickerHtml = kinds.length
+        ? '<span class="entry-stickers">' +
+          kinds.map(function (kind, i) {
+            return stickerMarkup(kind, stickerTilt((entry.id || entry.message || '') + ':' + i + ':' + kind, kind));
+          }).join('') +
+          '</span>'
+        : '';
       note.innerHTML =
         '<span class="entry-line">' +
-        '<span class="entry-message">' + escapeHtml(entry.message) + '</span>' +
+        '<span class="entry-message-row">' +
+        (messageText
+          ? '<span class="entry-message">' + escapeHtml(messageText) + '</span>'
+          : '') +
+        stickerHtml +
+        '</span>' +
         metaHtml +
         '</span>';
       return note;
@@ -2260,7 +3541,14 @@ body.is-docked .book-wrap.is-closed .book:not(:hover):not(:focus-visible):not(.i
             return ((Number(a.entry.pageIndex) || 0) - (Number(b.entry.pageIndex) || 0)) || (a.i - b.i);
           })
           .forEach(function (item) {
-            firstList.appendChild(createScatterNote(item.entry));
+            var note = createScatterNote(item.entry);
+            // Pack fresh on every open rather than replaying saved spots: those
+            // were found at some other book size and text size (often a single
+            // column on a small screen), and a dense pack fits two or three
+            // notes to a row at whatever size the book is now.
+            note.style.left = '';
+            note.style.top = '';
+            firstList.appendChild(note);
           });
       }
       // Measure real sizes, place with rotated AABB, then fade in
@@ -2524,8 +3812,8 @@ body.is-docked .book-wrap.is-closed .book:not(:hover):not(:focus-visible):not(.i
         message: message,
         name: String(name || '').trim() || '—',
         date: getTodayStamp(),
-        rotation: Math.random() * 14 - 7,
-        color: NOTE_COLORS[Math.floor(Math.random() * NOTE_COLORS.length)]
+        rotation: tiltFor(id),
+        color: currentPen.ink
       };
 
       placementQueue.push(draft);
@@ -2555,6 +3843,8 @@ body.is-docked .book-wrap.is-closed .book:not(:hover):not(:focus-visible):not(.i
       }, NAME_HINT_MS);
     }
 
+    var coarsePointer = window.matchMedia('(pointer: coarse)');
+
     function syncMessageMirror() {
       var raw = messageInput.value;
       var empty = raw.length === 0;
@@ -2563,21 +3853,586 @@ body.is-docked .book-wrap.is-closed .book:not(:hover):not(:focus-visible):not(.i
       messageForm.classList.toggle('is-empty', empty);
       messageForm.classList.toggle('is-ready', canSend);
       messageMirror.classList.toggle('is-empty', empty);
-      /* Placeholder only when idle+empty; hide on focus so caret is left-most */
+      /* Placeholder only when idle+empty; hide on focus so caret is left-most.
+         Touch keeps it while focused: the field is focused from the start. */
       messageMirrorText.textContent = empty
-        ? (focused ? '' : PLACEHOLDER)
+        ? (focused && !coarsePointer.matches ? '' : PLACEHOLDER)
         : raw;
       messageSend.disabled = !canSend;
       messageSend.classList.toggle('is-ready', canSend);
     }
 
-    function resetMessageField() {
+    /** keepFocus: touch, after a send, so the keyboard stays up for the next note. */
+    function resetMessageField(keepFocus) {
       clearNameHintTimer();
       setNameHint(false);
       messageInput.value = '';
       if (nameInput) nameInput.value = '';
-      syncMessageMirror();
+      if (keepFocus) {
+        if (document.activeElement !== messageInput) {
+          try { messageInput.focus({ preventScroll: true }); } catch (_e) { messageInput.focus(); }
+        }
+        syncMessageMirror();
+        return;
+      }
       messageForm.classList.remove('is-focused');
+      /* Drop real focus too, or the placeholder stays hidden (idle+empty only). */
+      if (document.activeElement === messageInput) messageInput.blur();
+      if (nameInput && document.activeElement === nameInput) nameInput.blur();
+      syncMessageMirror();
+    }
+
+    function penForInk(ink) {
+      var key = String(ink || '').toUpperCase();
+      for (var i = 0; i < PEN_INKS.length; i++) {
+        if (PEN_INKS[i].ink === key) return PEN_INKS[i];
+      }
+      return null;
+    }
+
+    function penById(id) {
+      for (var i = 0; i < PEN_INKS.length; i++) {
+        if (PEN_INKS[i].id === id) return PEN_INKS[i];
+      }
+      return null;
+    }
+
+    /* Every visit starts on the black pen; the choice lasts only while the
+       book is open (hideMessageInput puts black back). */
+    var currentPen = PEN_INKS[0];
+    var penRack = document.getElementById('pen-rack');
+
+    function selectPen(pen) {
+      currentPen = pen;
+      penRack.querySelectorAll('.pen').forEach(function (btn) {
+        btn.setAttribute('aria-pressed', btn.dataset.pen === pen.id ? 'true' : 'false');
+      });
+      if (messageDock) messageDock.style.setProperty('--ink', pen.ink);
+      syncPenPicker(pen);
+    }
+
+    function buildPenRack() {
+      PEN_INKS.forEach(function (pen, i) {
+        var btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'pen';
+        btn.dataset.pen = pen.id;
+        btn.style.setProperty('--i', String(i));
+        btn.tabIndex = -1;
+        btn.setAttribute('aria-label', pen.label + ' ink');
+        btn.innerHTML =
+          '<span class="pen__body"><img src="pens/pen-' + pen.id +
+          '.webp" alt="" width="640" height="78" draggable="false" decoding="async"></span>';
+        // Keep focus (and the caret) in the message field while picking.
+        btn.addEventListener('mousedown', function (e) { e.preventDefault(); });
+        btn.addEventListener('click', function () { selectPen(pen); });
+        penRack.appendChild(btn);
+      });
+      selectPen(currentPen);
+    }
+    buildPenRack();
+
+    /* ── Ink picker variants ─────────────────────────────────────────────
+     * body[data-pen-ui] decides how ink is picked; the menu in the lower left
+     * switches it. All of them share currentPen / selectPen(). */
+    var PEN_UI_STORAGE_KEY = 'guestbook_pen_ui';
+    var PEN_UIS = [
+      { id: 'rack', name: 'Rack', note: 'Pens peek in from the right edge' },
+      { id: 'tile', name: 'Swatches', note: 'Hover the pen beside the field' },
+      { id: 'bar', name: 'Bar', note: 'The pens, held in a bar on the right' },
+      { id: 'v4', name: 'Option 4', note: 'Coming soon', soon: true },
+      { id: 'v5', name: 'Option 5', note: 'Coming soon', soon: true }
+    ];
+    var penUi = (function () {
+      try {
+        var saved = localStorage.getItem(PEN_UI_STORAGE_KEY);
+        for (var i = 0; i < PEN_UIS.length; i++) {
+          if (PEN_UIS[i].id === saved && !PEN_UIS[i].soon) return saved;
+        }
+      } catch (_e) {}
+      return 'rack';
+    })();
+    document.body.dataset.penUi = penUi;
+
+    function penUiUsesRack() {
+      return penUi === 'rack' || penUi === 'bar';
+    }
+
+    /* ── tile: one pen beside the field; hover or tap it for swatches ── */
+    /* Swatch layouts (menu > Dot layout). All are measured off the live tile,
+       so they track its size and corner radius at every breakpoint:
+         corner  dots ride a path parallel to the tile's outline: down its left
+                 side, round the bottom-left corner on an arc concentric with
+                 the tile's own corner radius, then along the bottom
+         grid    two columns of three left of the tile, centred on it
+         tray    a pill rising out of the tile with the dots stacked inside
+       Phones have no room left of the dock, so corner and grid stack the dots
+       up above the tile instead. */
+    var SWATCH_LAYOUTS = [
+      { id: 'corner', name: 'Corner', note: "Follow the tile's rounded corner" },
+      { id: 'grid', name: 'Grid', note: 'Two columns beside the tile' },
+      { id: 'tray', name: 'Tray', note: 'A pill rising out of the tile' }
+    ];
+    var SWATCH_LAYOUT_STORAGE_KEY = 'guestbook_swatch_layout';
+    var swatchLayout = (function () {
+      try {
+        var saved = localStorage.getItem(SWATCH_LAYOUT_STORAGE_KEY);
+        for (var i = 0; i < SWATCH_LAYOUTS.length; i++) {
+          if (SWATCH_LAYOUTS[i].id === saved) return saved;
+        }
+      } catch (_e) {}
+      return 'corner';
+    })();
+    document.body.dataset.swatchLayout = swatchLayout;
+    var phoneQuery = window.matchMedia('(max-width: 640px)');
+    var PICKER_SWATCHES = [
+      { id: 'black', color: '#111111' },
+      { id: 'pink', color: '#EC4C8E' },
+      { id: 'orange', color: '#F2733A' },
+      { id: 'green', color: '#8CC63F' },
+      { id: 'blue', color: '#3B82F6' },
+      { id: 'purple', color: '#9C6CF5' }
+    ];
+
+    /** n points evenly spaced along a chain of segments, ends included. */
+    function spreadAlong(segs, n) {
+      var total = 0;
+      segs.forEach(function (sg) { total += sg.len; });
+      var out = [];
+      for (var i = 0; i < n; i++) {
+        var d = total * i / (n - 1);
+        for (var k = 0; k < segs.length; k++) {
+          var sg = segs[k];
+          if (d <= sg.len || k === segs.length - 1) {
+            out.push(sg.at(sg.len ? Math.min(1, d / sg.len) : 0));
+            break;
+          }
+          d -= sg.len;
+        }
+      }
+      return out;
+    }
+
+    /** Swatch centres in px, origin at the tile's top-left. */
+    function swatchPoints(layout, T, rc, n) {
+      var D, pts = [], i;
+      if (layout === 'tray') {
+        D = T * 0.34;
+        var trayGap = 8;
+        var step = D + Math.round(T * 0.17);
+        var pad = (T - D) / 2;
+        for (i = 0; i < n; i++) pts.push([T / 2, -trayGap - pad - D / 2 - i * step]);
+        return {
+          D: D, pts: pts, pull: 0.05,
+          tray: { gap: trayGap, h: 2 * pad + n * D + (n - 1) * (step - D) }
+        };
+      }
+      D = T * 0.27;
+      if (phoneQuery.matches) {
+        for (i = 0; i < n; i++) pts.push([T / 2, -(10 + D / 2) - i * (D + 8)]);
+        return { D: D, pts: pts, pull: 0.06 };
+      }
+      if (layout === 'grid') {
+        var pitch = D + Math.round(T * 0.13);
+        var right = -(Math.round(T * 0.24) + D / 2);
+        for (i = 0; i < n; i++) {
+          var col = i < 3 ? 0 : 1;
+          pts.push([right - col * pitch, T / 2 + ((i % 3) - 1) * pitch]);
+        }
+        return { D: D, pts: pts, pull: 0.25 };
+      }
+      // corner
+      var off = Math.round(T * 0.17) + D / 2;
+      var R = rc + off;
+      var y0 = D / 2;
+      var x1 = T - D / 2;
+      pts = spreadAlong([
+        { len: Math.max(0, T - rc - y0), at: function (t) { return [-off, y0 + t * (T - rc - y0)]; } },
+        { len: Math.PI / 2 * R, at: function (t) {
+          var a = Math.PI - t * Math.PI / 2;
+          return [rc + R * Math.cos(a), T - rc + R * Math.sin(a)];
+        } },
+        { len: Math.max(0, x1 - rc), at: function (t) { return [rc + t * (x1 - rc), T + off]; } }
+      ], n);
+      return { D: D, pts: pts, pull: 0.25 };
+    }
+
+    var penPicker = document.getElementById('pen-picker');
+    var penPickerTile = penPicker.querySelector('.pen-picker__tile');
+    var penPickerPen = penPicker.querySelector('.pen-picker__pen');
+    /* The ink layer on top; a swap stacks a new one over it. */
+    var penPickerInk = penPicker.querySelector('.pen-picker__ink');
+    var penPickerSwatches = penPicker.querySelector('.pen-picker__swatches');
+    var pickerOpen = false;
+    var pickerCloseTimer = null;
+    var pickerPointer = 'mouse';
+    var pickerToggledAt = -Infinity;
+    var penPickerTray = null;
+
+    /* Place the dots for the current layout and size the hover bridge to
+       cover them. Cheap; run whenever the picker opens or the tile resizes. */
+    function layoutSwatches() {
+      if (!penPicker || penUi !== 'tile') return;
+      var T = penPickerTile.offsetWidth;
+      if (!T) return;
+      var rc = Math.min(T / 2, parseFloat(getComputedStyle(penPickerTile).borderTopLeftRadius) || 0);
+      var btns = penPickerSwatches.querySelectorAll('.pen-picker__swatch');
+      var lay = swatchPoints(swatchLayout, T, rc, btns.length);
+      var minX = 0, minY = 0, maxX = T, maxY = T;
+      btns.forEach(function (btn, i) {
+        var p = lay.pts[i];
+        btn.style.setProperty('--wx', (p[0] / T).toFixed(4));
+        btn.style.setProperty('--wy', (p[1] / T).toFixed(4));
+        minX = Math.min(minX, p[0] - lay.D / 2);
+        minY = Math.min(minY, p[1] - lay.D / 2);
+        maxX = Math.max(maxX, p[0] + lay.D / 2);
+        maxY = Math.max(maxY, p[1] + lay.D / 2);
+      });
+      if (lay.tray) {
+        penPicker.style.setProperty('--tray-gap', lay.tray.gap + 'px');
+        penPicker.style.setProperty('--tray-h', lay.tray.h.toFixed(1) + 'px');
+        minY = Math.min(minY, -lay.tray.gap - lay.tray.h);
+      }
+      var pad = 10;
+      penPicker.style.setProperty('--swatch', lay.D.toFixed(2) + 'px');
+      penPicker.style.setProperty('--pull', String(lay.pull));
+      penPicker.style.setProperty('--bridge-l', (minX - pad).toFixed(1) + 'px');
+      penPicker.style.setProperty('--bridge-t', (minY - pad).toFixed(1) + 'px');
+      penPicker.style.setProperty('--bridge-r', (T - maxX - pad).toFixed(1) + 'px');
+      penPicker.style.setProperty('--bridge-b', (T - maxY - pad).toFixed(1) + 'px');
+    }
+    /* Swatches variant: the first character typed in a visit fans the
+       swatches out and pins them open (hover-out and outside clicks no longer
+       close them) until a colour is picked or the message is sent. */
+    var pickerPinned = false;
+    var inkChosen = false;
+
+    /** force: close even while pinned (book closing, variant switch, Esc). */
+    function setPickerOpen(on, force) {
+      if (!on && pickerPinned && !force) return;
+      if (!on) pickerPinned = false;
+      clearTimeout(pickerCloseTimer);
+      pickerCloseTimer = null;
+      if (!penPicker || pickerOpen === on) return;
+      if (on) layoutSwatches();
+      pickerOpen = on;
+      var now = performance.now();
+      penPicker.classList.toggle('is-quick', now - pickerToggledAt < 360);
+      pickerToggledAt = now;
+      penPicker.classList.toggle('is-open', on);
+      penPickerTile.setAttribute('aria-expanded', on ? 'true' : 'false');
+      penPickerSwatches.querySelectorAll('.pen-picker__swatch').forEach(function (btn) {
+        btn.tabIndex = on ? 0 : -1;
+      });
+    }
+
+    /* Re-ink, don't replace: the new pen fades in over the old one, settling
+       up 3px out of a soft blur. Barrels match, so only the tip and collar
+       visibly change. Quick repeat picks stack cleanly: any layer still
+       fading out is dropped. */
+    function swapPickerPen(src) {
+      var old = penPickerInk;
+      var next = old.cloneNode(true);
+      next.querySelector('img').src = src;
+      penPickerPen.querySelectorAll('.pen-picker__ink').forEach(function (layer) {
+        if (layer !== old) layer.remove();
+      });
+      var from = parseFloat(getComputedStyle(old).opacity);
+      old.getAnimations().forEach(function (a) { a.cancel(); });
+      penPickerPen.appendChild(next);
+      penPickerInk = next;
+      next.animate(
+        [
+          { opacity: 0, transform: 'translateY(3px)', filter: 'blur(2px)' },
+          { opacity: 1, transform: 'none', filter: 'blur(0px)' }
+        ],
+        { duration: 240, easing: 'cubic-bezier(0.23, 1, 0.32, 1)' }
+      );
+      var fade = old.animate(
+        [
+          { opacity: isNaN(from) ? 1 : from, filter: 'blur(0px)' },
+          { opacity: 0, filter: 'blur(2px)' }
+        ],
+        { duration: 200, easing: 'ease', fill: 'forwards' }
+      );
+      fade.onfinish = function () { old.remove(); };
+    }
+
+    function syncPenPicker(pen) {
+      if (!penPicker) return;
+      penPickerSwatches.querySelectorAll('.pen-picker__swatch').forEach(function (btn) {
+        btn.setAttribute('aria-pressed', btn.dataset.pen === pen.id ? 'true' : 'false');
+      });
+      var src = 'pens/pen-' + pen.id + '.webp';
+      if (penPickerInk.querySelector('img').getAttribute('src') === src) return;
+      var shown = penUi === 'tile' && messageDock.classList.contains('is-visible');
+      if (!shown || prefersReducedMotion.matches || !penPickerInk.animate) {
+        penPickerInk.querySelector('img').src = src;
+        return;
+      }
+      swapPickerPen(src);
+    }
+
+    function buildPenPicker() {
+      penPickerTray = document.createElement('span');
+      penPickerTray.className = 'pen-picker__tray';
+      penPickerTray.setAttribute('aria-hidden', 'true');
+      penPickerSwatches.appendChild(penPickerTray);
+      PICKER_SWATCHES.forEach(function (spot, i) {
+        var pen = penById(spot.id);
+        if (!pen) return;
+        var btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'pen-picker__swatch';
+        btn.dataset.pen = pen.id;
+        btn.tabIndex = -1;
+        btn.setAttribute('aria-label', pen.label + ' ink');
+        btn.style.setProperty('--i', String(i));
+        btn.style.setProperty('--swatch-c', spot.color);
+        btn.addEventListener('mousedown', function (e) { e.preventDefault(); });
+        btn.addEventListener('click', function () {
+          var wasPinned = pickerPinned;
+          inkChosen = true;
+          pickerPinned = false;
+          selectPen(pen);
+          // Touch has no hover-out, and a pinned picker was opened by typing
+          // rather than hover: let the swap play, then fold away. A mouse
+          // still over the picker closes it on leave as usual.
+          if (pickerPointer !== 'mouse' || (wasPinned && !penPicker.matches(':hover'))) {
+            clearTimeout(pickerCloseTimer);
+            pickerCloseTimer = setTimeout(function () { setPickerOpen(false); }, 520);
+          }
+        });
+        penPickerSwatches.appendChild(btn);
+      });
+
+      penPicker.addEventListener('pointerdown', function (e) { pickerPointer = e.pointerType || 'mouse'; });
+      penPicker.addEventListener('pointerenter', function (e) {
+        if (e.pointerType !== 'mouse') return;
+        setPickerOpen(true);
+      });
+      penPicker.addEventListener('pointerleave', function (e) {
+        if (e.pointerType !== 'mouse') return;
+        clearTimeout(pickerCloseTimer);
+        pickerCloseTimer = setTimeout(function () { setPickerOpen(false); }, 160);
+      });
+      // Keep focus (and the caret) in the message field while picking.
+      penPickerTile.addEventListener('mousedown', function (e) { e.preventDefault(); });
+      penPickerTile.addEventListener('click', function (e) {
+        // Mouse already opened it on hover; a click there should not close it.
+        var viaMouse = pickerPointer === 'mouse' && e.detail > 0;
+        setPickerOpen(viaMouse ? true : !pickerOpen);
+      });
+      document.addEventListener('pointerdown', function (e) {
+        if (pickerOpen && !penPicker.contains(e.target)) setPickerOpen(false);
+      });
+
+      // First character of the visit: offer the inks and hold them open.
+      messageInput.addEventListener('input', function () {
+        if (penUi !== 'tile' || inkChosen || pickerPinned) return;
+        if (!messageInput.value.length) return;
+        setPickerOpen(true);
+        pickerPinned = true;
+      });
+      // Sending keeps the pen in hand, which counts as the choice.
+      messageForm.addEventListener('submit', function () {
+        if (!pickerPinned) return;
+        inkChosen = true;
+        setPickerOpen(false, true);
+      });
+
+      window.addEventListener('resize', layoutSwatches);
+
+      penPickerInk.querySelector('img').src = 'pens/pen-' + currentPen.id + '.webp';
+      syncPenPicker(currentPen);
+      layoutSwatches();
+    }
+    buildPenPicker();
+
+    /* ── Variant menu ── */
+    var penUiMenu = document.getElementById('pen-ui-menu');
+    var penUiTrigger = penUiMenu.querySelector('.pen-ui-menu__trigger');
+    var penUiValue = penUiMenu.querySelector('.pen-ui-menu__value');
+    var penUiList = penUiMenu.querySelector('.pen-ui-menu__list');
+    var penUiMenuOpen = false;
+
+    function setPenUiMenuOpen(on) {
+      penUiMenuOpen = !!on;
+      penUiMenu.classList.toggle('is-open', penUiMenuOpen);
+      penUiTrigger.setAttribute('aria-expanded', penUiMenuOpen ? 'true' : 'false');
+      penUiList.querySelectorAll('.pen-ui-menu__item').forEach(function (btn) {
+        btn.tabIndex = penUiMenuOpen && !btn.disabled ? 0 : -1;
+      });
+    }
+
+    function setPenUiMenuVisible(on) {
+      penUiMenu.classList.toggle('is-visible', on);
+      penUiMenu.setAttribute('aria-hidden', on ? 'false' : 'true');
+      penUiTrigger.tabIndex = on ? 0 : -1;
+      if (!on) setPenUiMenuOpen(false);
+    }
+
+    function syncPenUiMenu() {
+      PEN_UIS.forEach(function (ui) {
+        if (ui.id === penUi) penUiValue.textContent = ui.name;
+      });
+      if (penUi === 'tile') {
+        SWATCH_LAYOUTS.forEach(function (l) {
+          if (l.id === swatchLayout) penUiValue.textContent += ' \u00B7 ' + l.name;
+        });
+      }
+      penUiList.querySelectorAll('.pen-ui-menu__item[data-ui]').forEach(function (btn) {
+        btn.setAttribute('aria-checked', btn.dataset.ui === penUi ? 'true' : 'false');
+      });
+      penUiList.querySelectorAll('.pen-ui-menu__item[data-layout]').forEach(function (btn) {
+        btn.setAttribute('aria-checked', btn.dataset.layout === swatchLayout ? 'true' : 'false');
+      });
+    }
+
+    function setSwatchLayout(id) {
+      swatchLayout = id;
+      document.body.dataset.swatchLayout = id;
+      try { localStorage.setItem(SWATCH_LAYOUT_STORAGE_KEY, id); } catch (_e) {}
+      setPickerOpen(false, true);
+      layoutSwatches();
+      syncPenUiMenu();
+      // Fan the new layout out so it can be judged straight away; it folds
+      // on the next click elsewhere or hover in-and-out, as usual.
+      setTimeout(function () {
+        if (penUi === 'tile' && messageDock.classList.contains('is-visible')) setPickerOpen(true);
+      }, 160);
+    }
+
+    function setPenUi(id) {
+      if (id === penUi) return;
+      var dockShown = messageDock.classList.contains('is-visible');
+      // Drop the outgoing picker at once, then let the new one make its entrance.
+      penRack.classList.add('is-instant');
+      setPenRackVisible(false);
+      setPickerOpen(false, true);
+      void penRack.offsetWidth;
+      penUi = id;
+      document.body.dataset.penUi = id;
+      try { localStorage.setItem(PEN_UI_STORAGE_KEY, id); } catch (_e) {}
+      syncPenUiMenu();
+      void penRack.offsetWidth;
+      penRack.classList.remove('is-instant');
+      if (!dockShown) return;
+      requestAnimationFrame(function () {
+        if (!messageDock.classList.contains('is-visible')) return;
+        setPenRackVisible(true);
+        if (id === 'tile') layoutSwatches();
+        if (id === 'tile' && penPicker.animate && !prefersReducedMotion.matches) {
+          penPicker.animate(
+            [{ opacity: 0, transform: 'scale(0.9)' }, { opacity: 1, transform: 'none' }],
+            { duration: 260, easing: 'cubic-bezier(0.23, 1, 0.32, 1)' }
+          );
+        }
+      });
+    }
+
+    PEN_UIS.forEach(function (ui, i) {
+      var btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'pen-ui-menu__item';
+      btn.setAttribute('role', 'menuitemradio');
+      btn.dataset.ui = ui.id;
+      btn.tabIndex = -1;
+      btn.disabled = !!ui.soon;
+      btn.innerHTML =
+        '<span class="pen-ui-menu__num">' + (i + 1) + '</span>' +
+        '<span class="pen-ui-menu__text"><span class="pen-ui-menu__name">' + ui.name +
+        '</span><span class="pen-ui-menu__note">' + ui.note + '</span></span>';
+      btn.addEventListener('mousedown', function (e) { e.preventDefault(); });
+      btn.addEventListener('click', function () {
+        setPenUi(ui.id);
+        setPenUiMenuOpen(false);
+      });
+      penUiList.appendChild(btn);
+    });
+
+    var swatchLayoutGroup = document.createElement('div');
+    swatchLayoutGroup.className = 'pen-ui-menu__sub';
+    swatchLayoutGroup.setAttribute('role', 'group');
+    swatchLayoutGroup.setAttribute('aria-label', 'Dot layout');
+    swatchLayoutGroup.innerHTML = '<p class="pen-ui-menu__heading">Dot layout</p>';
+    SWATCH_LAYOUTS.forEach(function (l, i) {
+      var btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'pen-ui-menu__item';
+      btn.setAttribute('role', 'menuitemradio');
+      btn.dataset.layout = l.id;
+      btn.tabIndex = -1;
+      btn.innerHTML =
+        '<span class="pen-ui-menu__num pen-ui-menu__num--sub">' + String.fromCharCode(65 + i) + '</span>' +
+        '<span class="pen-ui-menu__text"><span class="pen-ui-menu__name">' + l.name +
+        '</span><span class="pen-ui-menu__note">' + l.note + '</span></span>';
+      btn.addEventListener('mousedown', function (e) { e.preventDefault(); });
+      btn.addEventListener('click', function () {
+        setPenUiMenuOpen(false);
+        setSwatchLayout(l.id);
+      });
+      swatchLayoutGroup.appendChild(btn);
+    });
+    penUiList.appendChild(swatchLayoutGroup);
+    syncPenUiMenu();
+
+    penUiTrigger.addEventListener('mousedown', function (e) { e.preventDefault(); });
+    penUiTrigger.addEventListener('click', function () { setPenUiMenuOpen(!penUiMenuOpen); });
+    // Clicks here must not reach the frost (which closes the book).
+    penUiMenu.addEventListener('click', function (e) { e.stopPropagation(); });
+    document.addEventListener('pointerdown', function (e) {
+      if (penUiMenuOpen && !penUiMenu.contains(e.target)) setPenUiMenuOpen(false);
+    });
+    // Esc folds an open popover before it closes the book.
+    window.addEventListener('keydown', function (e) {
+      if (e.key !== 'Escape' || (!penUiMenuOpen && !pickerOpen)) return;
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      setPenUiMenuOpen(false);
+      setPickerOpen(false, true);
+    }, true);
+
+    /** Side of the viewport the rack hangs from: right if it clears the book. */
+    function placePenRack() {
+      var cs = getComputedStyle(penRack);
+      var reach = parseFloat(cs.getPropertyValue('--pen-peek')) +
+        parseFloat(cs.getPropertyValue('--pen-selected')) + 12;
+      if (penUi === 'bar') {
+        reach += parseFloat(cs.getPropertyValue('--bar-pad-l')) +
+          parseFloat(cs.getPropertyValue('--bar-inset'));
+      }
+      var stageEl = document.getElementById('stage');
+      var stage = stageEl.getBoundingClientRect();
+      penRack.classList.toggle('is-bottom', window.innerWidth - stage.right < reach);
+      document.body.classList.toggle('has-bottom-pens',
+        penRack.classList.contains('is-visible') && penRack.classList.contains('is-bottom'));
+      // The bar centres on the open book, not the viewport: the book sits
+      // above centre to leave room for the message dock. Measured from layout
+      // (offsets), not the bounding box, so the stage's open / dock transform
+      // mid-flight cannot skew it. (.pen-rack's translateY(-50%) does the rest.)
+      if (penUi === 'bar' && !penRack.classList.contains('is-bottom')) {
+        var y = stageEl.offsetHeight / 2;
+        for (var el = stageEl; el; el = el.offsetParent) y += el.offsetTop;
+        penRack.style.top = y.toFixed(1) + 'px';
+      } else {
+        penRack.style.top = '';
+      }
+    }
+
+    window.addEventListener('resize', function () {
+      if (penRack.classList.contains('is-visible')) placePenRack();
+    });
+
+    function setPenRackVisible(on) {
+      on = on && penUiUsesRack();
+      if (on) placePenRack();
+      document.body.classList.toggle('has-bottom-pens', on && penRack.classList.contains('is-bottom'));
+      penRack.classList.toggle('is-visible', on);
+      penRack.setAttribute('aria-hidden', on ? 'false' : 'true');
+      penRack.querySelectorAll('.pen').forEach(function (btn) {
+        btn.tabIndex = on ? 0 : -1;
+      });
     }
 
     function scheduleMessageInputShow() {
@@ -2587,6 +4442,13 @@ body.is-docked .book-wrap.is-closed .book:not(:hover):not(:focus-visible):not(.i
         if (phase !== 'opening' && phase !== 'open') return;
         messageDock.classList.add('is-visible');
         messageDock.setAttribute('aria-hidden', 'false');
+        document.querySelectorAll('.page-turn-hint').forEach(function (hint) {
+          hint.classList.add('is-visible');
+        });
+        setPenRackVisible(true);
+        setPenUiMenuVisible(true);
+        setBookCloseVisible(true);
+        handKeyboardToField();
       }, delay);
     }
 
@@ -2595,7 +4457,25 @@ body.is-docked .book-wrap.is-closed .book:not(:hover):not(:focus-visible):not(.i
       clearNameHintTimer();
       messageDock.classList.remove('is-visible');
       messageDock.setAttribute('aria-hidden', 'true');
+      document.querySelectorAll('.page-turn-hint').forEach(function (hint) {
+        hint.classList.remove('is-visible');
+      });
+      setPenRackVisible(false);
+      setPickerOpen(false, true);
+      setPenUiMenuVisible(false);
+      setBookCloseVisible(false);
+      dropKeyboardProxy();
       resetMessageField();
+      // Drop any keyboard fit before the book flies home.
+      var st = document.getElementById('stage');
+      if (st) { st.style.translate = ''; st.style.scale = ''; }
+      var sl = messageDock.querySelector('.message-dock-slot');
+      if (sl) sl.style.translate = '';
+      penRack.style.bottom = '';
+      document.body.classList.remove('kb-open');
+      // Next visit starts fresh: black pen, and the swatches prompt again.
+      inkChosen = false;
+      selectPen(PEN_INKS[0]);
     }
 
     function commitMessage() {
@@ -2625,7 +4505,8 @@ body.is-docked .book-wrap.is-closed .book:not(:hover):not(:focus-visible):not(.i
 
       clearMessageError();
       placeEntryWithOverflow(cleaned, name);
-      resetMessageField();
+      // Touch: the keyboard stays up, ready for another note.
+      resetMessageField(coarsePointer.matches);
     }
 
     /** Unclip stage while hard cover flaps open/closed */
@@ -3229,6 +5110,47 @@ body.is-docked .book-wrap.is-closed .book:not(:hover):not(:focus-visible):not(.i
       }
     }
 
+    /*
+     * Keyboard up by default on touch. iOS only raises the keyboard for a
+     * focus() made inside the tap itself, and the message field is still
+     * hidden at that moment. So the opening tap focuses a tiny invisible
+     * stand-in field, and the moment the dock shows, focus moves to the real
+     * field; iOS keeps the keyboard up across a programmatic focus hop.
+     */
+    var keyboardProxy = null;
+    function primeKeyboard() {
+      if (!coarsePointer.matches || keyboardProxy) return;
+      keyboardProxy = document.createElement('input');
+      keyboardProxy.type = 'text';
+      keyboardProxy.tabIndex = -1;
+      keyboardProxy.setAttribute('aria-hidden', 'true');
+      keyboardProxy.autocomplete = 'off';
+      keyboardProxy.style.cssText =
+        'position:fixed;left:0;bottom:0;width:1px;height:1px;padding:0;border:0;' +
+        'opacity:0;font-size:16px;pointer-events:none;';
+      document.body.appendChild(keyboardProxy);
+      try { keyboardProxy.focus({ preventScroll: true }); } catch (_e) { keyboardProxy.focus(); }
+    }
+    function handKeyboardToField(tries) {
+      if (!keyboardProxy) return;
+      tries = tries || 0;
+      try { messageInput.focus({ preventScroll: true }); } catch (_e) { messageInput.focus(); }
+      // The dock turns visible in the same tick it is shown, and a field in a
+      // box still mid-way from visibility: hidden cannot take focus yet. Keep
+      // the stand-in (and the keyboard) until the real field has it.
+      if (document.activeElement !== messageInput && tries < 12 && (phase === 'opening' || phase === 'open')) {
+        requestAnimationFrame(function () { handKeyboardToField(tries + 1); });
+        return;
+      }
+      dropKeyboardProxy();
+    }
+    function dropKeyboardProxy() {
+      if (!keyboardProxy) return;
+      if (keyboardProxy.parentNode) keyboardProxy.parentNode.removeChild(keyboardProxy);
+      keyboardProxy = null;
+    }
+    // Capture, so it runs inside the tap before the open sequence starts.
+    cssBook.addEventListener('click', primeKeyboard, true);
     cssBook.addEventListener('click', openBook);
     cssBook.addEventListener('keydown', function (e) {
       if (e.key === 'Enter' || e.key === ' ') {
@@ -3376,6 +5298,125 @@ body.is-docked .book-wrap.is-closed .book:not(:hover):not(:focus-visible):not(.i
     });
 
     // The esc cap closes the book, same as the Escape key.
+    /*
+     * Phone / tablet typing. The on-screen keyboard covers the bottom of the
+     * screen, where the message field lives. While the field (or the name
+     * field) has focus and a keyboard is up, the field rides up to sit just
+     * above the keyboard, and the open book shrinks and re-centres into the
+     * room left above it, so you can see the page you are writing into.
+     * Everything goes back when the keyboard closes.
+     *
+     * Measured from the host page's visualViewport (the frame's own does not
+     * see the keyboard on iOS). Moves use the individual translate / scale
+     * properties, so they never fight the transforms the open / close
+     * sequence puts on #stage and the dock.
+     */
+    (function fitAboveKeyboard() {
+      var hostWin = window;
+      try {
+        if (window.parent !== window && window.parent.visualViewport) hostWin = window.parent;
+      } catch (_e) { hostWin = window; }
+      var vv = hostWin.visualViewport;
+      if (!vv) return;
+      var stageEl = document.getElementById('stage');
+      var slot = messageDock.querySelector('.message-dock-slot');
+      var smallScreen = window.matchMedia('(pointer: coarse), (max-width: 1199.98px)');
+      var PAD = 10;        // gap to the keyboard and to the top of the screen
+      var GAP = 12;        // gap between the book and the message field
+      var KEYBOARD_MIN = 120;
+      var raf = 0;
+      var active = false;
+
+      function layoutTop(el) {
+        var y = 0;
+        for (var e = el; e; e = e.offsetParent) y += e.offsetTop;
+        return y;
+      }
+
+      function reset() {
+        if (!active) return;
+        active = false;
+        document.body.classList.remove('kb-open');
+        stageEl.style.translate = '';
+        stageEl.style.scale = '';
+        slot.style.translate = '';
+        penRack.style.bottom = '';
+      }
+
+      function update() {
+        raf = 0;
+        var focused = document.activeElement;
+        var typing = focused === messageInput || focused === nameInput ||
+          (keyboardProxy && focused === keyboardProxy);
+        var keyboard = hostWin.innerHeight - vv.height;
+        if ((phase !== 'open' && phase !== 'opening') || !typing || !smallScreen.matches ||
+            Math.abs(vv.scale - 1) > 0.01 || keyboard < KEYBOARD_MIN) {
+          reset();
+          return;
+        }
+        var visTop = vv.offsetTop;
+        var visBottom = vv.offsetTop + vv.height;
+
+        // Pens racked on the bottom edge (Rack / Bar on a phone) become a
+        // toolbar stuck to the top of the keyboard; everything else stacks
+        // above them.
+        var trayH = 0;
+        if (penRack.classList.contains('is-visible') && penRack.classList.contains('is-bottom')) {
+          penRack.style.bottom = Math.max(0, hostWin.innerHeight - visBottom).toFixed(1) + 'px';
+          trayH = penRack.offsetWidth; // turned a quarter: its width is its height
+        } else {
+          penRack.style.bottom = '';
+        }
+
+        // Field: its bottom (name row included once it opens) just above the
+        // keys, or above the pen toolbar when there is one.
+        var fieldH = Math.max(slot.offsetHeight, messageForm.offsetHeight);
+        var slotTop = layoutTop(slot);
+        var fieldTop = visBottom - PAD - fieldH - (trayH ? trayH + 2 : 0);
+        slot.style.translate = '0 ' + (fieldTop - slotTop).toFixed(1) + 'px';
+
+        // Book: as large as fits between the top and the field, centred there.
+        var stH = stageEl.offsetHeight;
+        var stTop = layoutTop(stageEl);
+        var room = fieldTop - GAP - (visTop + PAD);
+        var k = Math.max(0.3, Math.min(1, room / stH));
+        var wantTop = visTop + PAD + Math.max(0, (room - stH * k) / 2);
+        var dy = wantTop - (stTop + stH * (1 - k) / 2); // scale is about the centre
+        stageEl.style.scale = k.toFixed(3);
+        stageEl.style.translate = '0 ' + dy.toFixed(1) + 'px';
+        active = true;
+        document.body.classList.add('kb-open');
+      }
+
+      function schedule() {
+        if (!raf) raf = requestAnimationFrame(update);
+      }
+
+      vv.addEventListener('resize', schedule);
+      vv.addEventListener('scroll', schedule);
+      document.addEventListener('focusin', schedule);
+      // Focus leaving lands before the keyboard finishes closing; wait a beat
+      // so a hop between the two fields does not bounce the layout.
+      document.addEventListener('focusout', function () { setTimeout(schedule, 60); });
+      // The name row opening changes the field's height.
+      if (window.ResizeObserver) new ResizeObserver(schedule).observe(messageForm);
+    })();
+
+    /* Corner close: same dismissal as Esc or the esc key cap. */
+    var bookCloseBtn = document.getElementById('book-close');
+    function setBookCloseVisible(on) {
+      bookCloseBtn.classList.toggle('is-visible', on);
+      bookCloseBtn.tabIndex = on ? 0 : -1;
+    }
+    bookCloseBtn.addEventListener('click', function (e) {
+      e.preventDefault();
+      e.stopPropagation();
+      if (typeof window.__guestbookAnnounceClosing === 'function') {
+        window.__guestbookAnnounceClosing();
+      }
+      dismissFromOverlay();
+    });
+
     document.querySelectorAll('.page-turn-hint__key[data-close]').forEach(function (btn) {
       btn.addEventListener('click', function (e) {
         e.preventDefault();
@@ -3651,6 +5692,9 @@ body.is-docked .book-wrap.is-closed .book:not(:hover):not(:focus-visible):not(.i
     // Capture phase, so this lands before the page's own click handler runs
     // openBook() -> initPageFlip(): #book must be back in the DOM by then.
     restoreBook();
+    // Drop the host's scroll pin before the cover flip starts. The pin is a
+    // transform on the iframe; left on, the flip would play down in the footer.
+    try { if (parent.__guestbookReleasePin) parent.__guestbookReleasePin(); } catch (err) {}
     // Host expands the iframe to fullscreen; it will undock us, and the book's
     // own openBook() runs from its real click handler as usual.
     post('requestOpen');

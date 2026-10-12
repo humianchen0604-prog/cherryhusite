@@ -9,7 +9,8 @@ docs
 $SP
 .DS_Store
 *.tsbuildinfo
-scripts
+scripts/*
+!scripts/inspect-note.mjs
 public/assets/external
 public/**/*.mov
 _archive

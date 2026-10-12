@@ -761,7 +761,7 @@ export default function CaseStudyBody() {
                             project.brand === 'TikTok'
                               ? { ...project, context: 'Design for login signup page with visual refresh' }
                               : project.brand === 'Loom'
-                                ? { ...project, context: 'xyz and xyz' }
+                                ? { ...project, context: 'Concept 2026' }
                                 : project
                           }
                         />

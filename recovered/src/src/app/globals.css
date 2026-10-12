@@ -1116,52 +1116,6 @@ html:has(.hero-cloud) {
   overflow-x: clip;
 }
 
-/* Hand-drawn sparkles after the Playground heading (Twinkle in
-   VibeCoding.tsx): outline-only stars and a plus in a fine pencil stroke, in
-   the text's own colour (black; light in night mode), sitting on its baseline. Each twinkles — shrinks and dims a little,
-   then back — on its own beat. */
-.twinkle {
-  display: inline-block;
-  /* 28 × 24 viewBox, at 90% of its first size. */
-  width: 1.18em;
-  height: 0.99em;
-  margin-left: 0.3em;
-  vertical-align: -0.1em;
-  overflow: visible;
-}
-
-.twinkle__star {
-  fill: none;
-  stroke: currentColor;
-  /* ~0.9px on screen at this size. */
-  stroke-width: 1.15;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  transform-box: fill-box;
-  transform-origin: center;
-  animation: twinkle 2.6s ease-in-out infinite;
-}
-
-.twinkle__star--top { animation-duration: 2.1s; animation-delay: -0.8s; }
-.twinkle__star--low { animation-duration: 2.9s; animation-delay: -1.7s; }
-
-@keyframes twinkle {
-  0%, 100% {
-    transform: scale(1) rotate(0deg);
-    opacity: 1;
-  }
-  50% {
-    transform: scale(0.8) rotate(8deg);
-    opacity: 0.55;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .twinkle__star {
-    animation: none;
-  }
-}
-
 /* The home root's opaque white would sit on top of the fixed sky; html/body
    are white underneath already, so this changes nothing but letting it show. */
 .framer-TE0xJ.framer-iogvpj,
@@ -1191,6 +1145,38 @@ html:has(.hero-cloud) {
 .footer_reveal-image {
   display: block;
   width: 100%;
+  transform-style: preserve-3d;
+}
+
+/* The reveal used to be written from JavaScript on scroll. A fast flick moved
+   the page first and the text a frame later, so the line beside the book
+   jumped upward to catch up. A scroll timeline runs on the compositor, locked
+   to the page position. The range (where in the scroll the slide runs) is set
+   from the footer's position. view() cannot be used here: the clip on
+   .footer_reveal keeps it from ever starting. */
+@keyframes footer-reveal {
+  from {
+    transform: translate3d(0, 100%, 0);
+    opacity: 0;
+  }
+  to {
+    transform: translate3d(0, 0, 0);
+    opacity: 1;
+  }
+}
+.footer_reveal-image[data-reveal='view'] {
+  animation-name: footer-reveal;
+  animation-duration: auto;
+  animation-timing-function: cubic-bezier(0.23, 1, 0.32, 1);
+  animation-fill-mode: both;
+  animation-timeline: scroll(root block);
+}
+@media (prefers-reduced-motion: reduce) {
+  .footer_reveal-image[data-reveal='view'] {
+    animation: none;
+    transform: none;
+    opacity: 1;
+  }
 }
 
 /* Night mode: no solid band. The footer paints the SAME fixed night gradient as
@@ -3997,6 +3983,9 @@ html.js .framer-TE0xJ .framer-mxkekt > *.in-view .project-grid .project-card {
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   column-gap: 15.75px;
   row-gap: 28px;
+  /* The side nav's "Writings" lands here with the same clearance as the
+     other sections it jumps to. */
+  scroll-margin-top: 60px;
   align-items: start;
   width: 100%;
   margin-top: 72px;
@@ -4004,18 +3993,31 @@ html.js .framer-TE0xJ .framer-mxkekt > *.in-view .project-grid .project-card {
 .framer-TE0xJ .playground-vault > .framer-1y0yjav {
   display: contents;
 }
-.playground-vault .framer-1i32gb2 {
+/* The section's eyebrow, set like ABOUT ME (AboutEnvelope.tsx). */
+.playground-vault__label {
   grid-column: 1 / -1;
   grid-row: 1;
+  width: 100%;
+  /* 24px to the title, as ABOUT ME and PLAYGROUND sit, against the grid's 28px row gap. */
+  margin: 0 0 -4px;
+  font-family: 'Switzer', 'Switzer Placeholder', sans-serif;
+  font-size: calc(clamp(10px, 1.3vw, 12px) * var(--text-scale, 1));
+  line-height: 1.2;
+  color: rgb(var(--fg-rgb, 0 0 0));
+  opacity: 0.4;
+}
+.playground-vault .framer-1i32gb2 {
+  grid-column: 1 / -1;
+  grid-row: 2;
 }
 .playground-vault a.framer-1q5icqq {
   grid-column: 1;
-  grid-row: 2;
+  grid-row: 3;
   min-width: 0;
 }
 .framer-TE0xJ .playground-vault > .framer-1gh0mvh {
   grid-column: 2;
-  grid-row: 2;
+  grid-row: 3;
   width: auto;
   min-width: 0;
   align-items: stretch;
@@ -5390,6 +5392,225 @@ button.other-design:focus-visible {
   }
 }
 
+/* --- Zoomed view: horizontal row ------------------------------------------
+ * Clicking a tile opens this over the page. The pieces keep the preview size
+ * and sit in one row; the bar under them is the scroll, drawn by hand so it
+ * stays visible. The corner button, a click on the frost (outside the current
+ * piece and the bar), or Escape closes it.
+ */
+.od-zoom {
+  padding: 0;
+  align-items: stretch;
+  justify-content: stretch;
+}
+
+.od-zoom__sheet {
+  position: relative;
+  z-index: 1;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 16px;
+  width: 100%;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  padding: 36px 0 64px;
+  box-sizing: border-box;
+}
+
+.od-zoom .od-rail__scroller {
+  width: 100%;
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+  touch-action: pan-y;
+}
+
+.od-rail__scroller::-webkit-scrollbar {
+  display: none;
+}
+
+.od-rail__track {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  width: max-content;
+}
+
+.od-slide {
+  --od-slide-w: min(88vw, 720px);
+  /* Same cap as the zoom overlay (70vh / 620px), tightened only when the
+     viewport can't also fit the heading, the write-up, and the scrollbar. */
+  --od-slide-h: min(70vh, 620px, calc(100svh - 280px));
+  flex: none;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  max-width: var(--od-slide-w);
+  overflow: hidden;
+}
+
+/* The artwork and its write-up, scaled together during a slide. The article
+   around it keeps the full layout size, so the row's measurements stay put. */
+.od-slide__body {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  max-width: 100%;
+  transform-origin: center center;
+}
+
+.od-slide .od-preview__still,
+.od-slide .od-preview__video,
+.od-slide .od-preview__flip img:first-child {
+  max-width: var(--od-slide-w);
+  max-height: var(--od-slide-h);
+}
+
+.od-slide .od-preview__stage {
+  width: var(--od-slide-w);
+  height: var(--od-slide-h);
+}
+
+.od-slide .od-preview__device {
+  width: min(var(--od-slide-w), calc(var(--od-slide-h) * 1320 / 940));
+}
+
+.od-slide .od-preview__video--crop {
+  height: min(var(--od-slide-h), calc(var(--od-slide-w) / var(--crop-ratio, 0.75)));
+}
+
+.od-slide .od-preview__meta {
+  text-align: left;
+}
+
+.od-slide .od-preview__head {
+  justify-content: space-between;
+}
+
+.od-slide .od-preview__title,
+.od-slide .od-preview__desc,
+.od-slide .od-preview__credits {
+  text-align: left;
+}
+
+.od-slide .od-preview__year {
+  margin-left: auto;
+  text-align: right;
+}
+
+.od-slide .od-preview__sound {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* The page caps body copy at 75ch. These lines belong to the piece above
+   them, so they wrap to that piece instead. */
+#main .od-slide p {
+  max-width: none;
+}
+
+/* The bar used to span the slide. It is now 90% shorter (a tenth of that
+   width), centered on the page. The track and the thumb are the same height. */
+.od-zoom__progress {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 18px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 240ms var(--od-ease);
+}
+
+.od-preview.is-open .od-zoom__progress {
+  opacity: 1;
+  pointer-events: auto;
+  transition-delay: 50ms;
+}
+
+.od-preview.is-closing .od-zoom__progress {
+  opacity: 0;
+  pointer-events: none;
+  transition-delay: 0ms;
+  transition-duration: 100ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .od-zoom__progress,
+  .od-preview.is-open .od-zoom__progress,
+  .od-preview.is-closing .od-zoom__progress {
+    transition: none;
+  }
+}
+
+.od-zoom__count {
+  font-family: 'Switzer', 'Switzer Placeholder', sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums;
+  color: rgb(0 0 0 / 0.55);
+}
+
+:root[data-theme='dark'] .od-zoom__count {
+  color: rgb(242 242 242 / 0.7);
+}
+
+.od-rail__bar {
+  position: relative;
+  flex: none;
+  width: min(8.8vw, 72px);
+  height: 6px;
+  cursor: pointer;
+  touch-action: none;
+}
+
+.od-rail__bar:focus-visible {
+  outline: 2px solid var(--page-fg, #000);
+  outline-offset: 4px;
+}
+
+.od-rail__bar::before,
+.od-rail__thumb {
+  height: 6px;
+  top: 0;
+  border-radius: 999px;
+}
+
+.od-rail__bar::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  background: rgb(0 0 0 / 0.18);
+}
+
+.od-rail__thumb {
+  position: absolute;
+  left: 0;
+  background: rgb(0 0 0 / 0.62);
+  cursor: grab;
+}
+
+.od-rail__thumb:active {
+  cursor: grabbing;
+}
+
+:root[data-theme='dark'] .od-rail__bar::before {
+  background: rgb(255 255 255 / 0.16);
+}
+
+:root[data-theme='dark'] .od-rail__thumb {
+  background: rgb(255 255 255 / 0.82);
+}
+
 
 /* A tile hosted outside the grid (PinchPrototype in the Recent prototypes
    row): it takes the host's box — whatever shape that is — instead of being a
@@ -5434,6 +5655,72 @@ button.other-design:focus-visible {
   justify-content: center;
   padding: 40px 24px;
   box-sizing: border-box;
+}
+
+/* Close: a filled circle with a little white transparency, black X on top.
+   Sits in the corner of either clicked view (the single preview and the row). */
+.od-preview__close {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  z-index: 3;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: rgb(255 255 255 / 0.82);
+  color: #000;
+  cursor: pointer;
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    opacity 200ms ease,
+    background-color 150ms ease,
+    scale 120ms ease;
+}
+
+/* 48px hit area around the 36px disc. */
+.od-preview__close::before {
+  content: '';
+  position: absolute;
+  inset: -6px;
+}
+
+.od-preview.is-open .od-preview__close {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.od-preview.is-closing .od-preview__close {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 80ms ease-out;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .od-preview__close:hover {
+    background: rgb(255 255 255 / 0.96);
+  }
+}
+
+.od-preview__close:active {
+  scale: 0.94;
+}
+
+.od-preview__close:focus-visible {
+  outline: 2px solid #000;
+  outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .od-preview__close,
+  .od-preview.is-open .od-preview__close,
+  .od-preview.is-closing .od-preview__close {
+    transition: none;
+  }
 }
 
 .od-preview__backdrop {
@@ -5770,6 +6057,72 @@ button.other-design:focus-visible {
 
 .od-preview__link:active {
   transform: scale(0.97);
+}
+
+/* Pinch zoom: the pill sits inside the bottom-right of the prototype frame,
+   inset from both edges. White fill, black label, no stroke. It waits until
+   the piece has nearly landed (same timing as the sound toggle) and leaves
+   as soon as the flight home starts. */
+.od-preview__link.od-preview__link--frame {
+  position: absolute;
+  right: 20px;
+  bottom: 20px;
+  z-index: 2;
+  margin: 0;
+  border: none;
+  background: #fff;
+  color: #000;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.od-preview__link--frame .od-preview__link-arrow {
+  opacity: 1;
+  color: #000;
+}
+
+.od-preview.is-open .od-preview__link--frame {
+  opacity: 1;
+  pointer-events: auto;
+  transition:
+    opacity 200ms ease-out 360ms,
+    background-color 160ms ease,
+    color 160ms ease,
+    transform 160ms ease-out;
+}
+
+.od-preview.is-closing .od-preview__link--frame {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 80ms ease-out;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .od-preview__link.od-preview__link--frame:hover {
+    background: #fff;
+    border-color: transparent;
+    color: #000;
+  }
+}
+
+:root[data-theme='dark'] .od-preview__link.od-preview__link--frame {
+  background: #fff;
+  border: none;
+  color: #000;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  :root[data-theme='dark'] .od-preview__link.od-preview__link--frame:hover {
+    background: #fff;
+    border-color: transparent;
+    color: #000;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .od-preview.is-open .od-preview__link--frame {
+    transition-delay: 0ms;
+  }
 }
 
 .od-preview__link:focus-visible {
@@ -6138,8 +6491,21 @@ button.other-design:focus-visible {
   color: rgb(255 255 255 / 0.4);
 }
 
+/* A slot whose prototype has landed: the tile fills the square, as Pinch
+   fills its card. */
+.prototype-slot.prototype-slot--filled {
+  display: block;
+  position: relative;
+  background: none;
+}
+
+.prototype-slot--filled > .other-design {
+  position: absolute;
+  inset: 0;
+}
+
 /* Night: the same panel treatment as the Other designs tiles. */
-:root[data-theme='dark'] .prototype-slot {
+:root[data-theme='dark'] .prototype-slot:not(.prototype-slot--filled) {
   background: rgb(255 255 255 / 0.04);
   box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.08);
 }
