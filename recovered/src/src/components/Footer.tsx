@@ -123,7 +123,7 @@ export default function Footer() {
         const end = Math.min(max, start + travel);
         const a = Math.max(0, Math.min(100, (start / max) * 100));
         const b = Math.max(a + 0.01, Math.min(100, (end / max) * 100));
-        image.style.animationRange = `${a.toFixed(3)}% ${b.toFixed(3)}%`;
+        image.style.setProperty('animation-range', `${a.toFixed(3)}% ${b.toFixed(3)}%`);
       };
       const syncFlag = () => markRevealed(easeOut(linearNow()) > 0.35);
       syncRange();
