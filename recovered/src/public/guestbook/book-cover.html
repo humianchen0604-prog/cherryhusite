@@ -1098,12 +1098,37 @@
       }
     }
 
-    /* Written notes, all text together: 80% on tablet, 60% on phone. */
+    /* Written notes, all text together: 80% on tablet. */
     @media (max-width: 1199.98px) {
       .scatter-note { --note-scale: 0.8; }
     }
+
+    /*
+     * Phone: a spread on a ~390px screen leaves each page ~180px wide, so the
+     * proportional sizes above land at 3-6px. Phones get readable floors
+     * instead. Bigger notes fit fewer to a page; the relayout passes the
+     * overflow on to the next page, so the book just runs a few pages longer.
+     */
     @media (max-width: 640px) {
-      .scatter-note { --note-scale: 0.6; }
+      .scatter-note { --note-scale: 1; }
+      .scatter-note[data-size="lg"] .entry-message,
+      .scatter-note[data-size="lg"] .entry-stickers {
+        font-size: max(13px, calc(22cqi / 3.72));
+      }
+      .scatter-note[data-size="md"] .entry-message,
+      .scatter-note[data-size="md"] .entry-stickers {
+        font-size: max(11px, calc(16cqi / 3.72));
+      }
+      .scatter-note[data-size="sm"] .entry-message,
+      .scatter-note[data-size="sm"] .entry-stickers {
+        font-size: max(10px, calc(12cqi / 3.72));
+      }
+      .scatter-note .entry-meta {
+        font-size: max(8px, calc(4.4cqi - 2px));
+      }
+      .scatter-note {
+        max-width: min(220px, 48%);
+      }
     }
 
     /* ── Message input (Figma 1551:28298 / 1551:28306) ─────────── */
@@ -1398,7 +1423,8 @@
       /* Same pen as the message, at 80% of that ink. */
       color: color-mix(in srgb, var(--ink, #1C1C1C) 80%, transparent);
       font-family: 'Switzer', sans-serif;
-      font-size: 14px;
+      /* 4px under the message line above it. */
+      font-size: calc(var(--message-size) - 4px);
       font-weight: 400;
       line-height: 1.35;
       letter-spacing: -0.01em;
@@ -1470,9 +1496,8 @@
     /*
      * Touch: the field takes focus as the book opens (keyboard up by default),
      * so the placeholder stays put while it is empty and the caret blinks in
-     * front of it. Native inputs at 16px: iOS zooms the page into any field
-     * under 16px on focus. The message field's own text is transparent (the
-     * mirror draws it), so only the name field visibly grows.
+     * front of it. The 16px input size that stops iOS zooming sits after the
+     * base #message-input rule below, which would otherwise win.
      */
     @media (pointer: coarse) {
       .message-pill.is-empty.is-focused .message-mirror-text { display: inline; }
@@ -1480,10 +1505,6 @@
         order: -1;
         margin: 0 2pt 0 0;
       }
-      #message-input,
-      .message-native,
-      #name-input,
-      .name-native { font-size: 16px; }
     }
 
     @keyframes message-caret-blink {
@@ -1507,6 +1528,19 @@
       font-weight: 400;
       line-height: 1.15;
       letter-spacing: -0.01em;
+    }
+
+    /*
+     * Touch: native inputs at 16px or more. iOS zooms the whole page into any
+     * field under 16px on focus, and once zoomed the keyboard fit gives up, so
+     * the book and field end up cropped. This has to come after the base rules
+     * above (same specificity, so the later one wins). The message field's own
+     * text is transparent (the mirror draws it), so only the name field
+     * visibly grows.
+     */
+    @media (pointer: coarse) {
+      #message-input,
+      .message-native { font-size: max(16px, var(--message-size)); }
     }
 
     #message-input::selection,
@@ -2160,6 +2194,22 @@
       body[data-pen-ui="bar"] .pen-rack.is-bottom { border-radius: 12px 0 0 12px; }
     }
 
+    /* Phone tray: about 0.8x the tablet bar all round, and shorter still — less
+       of each pen pokes up (30px peek, 7px lean for the chosen one), so the tray
+       stands ~42px tall instead of ~58px and ~192px wide instead of ~240px. */
+    @media (max-width: 640px) {
+      body[data-pen-ui="bar"] .pen-rack.is-bottom {
+        --pen-h: 16px;
+        --pen-gap: 10px;
+        --pen-peek: 30px;
+        --pen-hover: 3px;
+        --pen-selected: 7px;
+        --bar-pad-y: 10px;
+        --bar-pad-l: 5px;
+        border-radius: 10px 0 0 10px;
+      }
+    }
+
     @media (prefers-reduced-motion: reduce) {
       body[data-pen-ui="bar"] .pen-rack,
       body[data-pen-ui="bar"] .pen-rack.is-visible,
@@ -2663,6 +2713,36 @@ body.is-docked #notebook-paint-warm {
 body.is-closing-home #frost {
   opacity: 0;
   transition: opacity 300ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+/* Touch: the host paints the page blur (globals.css, .guestbook_layer::before)
+   so it can run past the frame's edges under the browser toolbar. The frost
+   stays as the tap-to-dismiss target, without a second blur on top. */
+/*
+ * Touch: the name line reads 4px under the message (10px against 14px), but
+ * iOS zooms the page into any field under 16px on focus. So the field keeps a
+ * real 16px and is scaled down to 10px (0.625 = 10 / 16; update it with
+ * --message-size). Width and padding are divided by the scale so it lands at
+ * the same width and 6px / 8px padding as before; the negative margin takes
+ * back the height the unscaled box still holds in layout.
+ */
+@media (pointer: coarse) {
+  #name-input,
+  .name-native {
+    font-size: 16px;
+    width: calc(100% / 0.625);
+    padding: calc(6px / 0.625) 0 calc(8px / 0.625);
+    transform: scale(0.625);
+    transform-origin: 0 0;
+    margin-bottom: calc((16px * 1.35 + 14px / 0.625) * (0.625 - 1));
+  }
+}
+
+@media (pointer: coarse) {
+  html.is-embed .frost-overlay {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
 }
 
 /* Docked, the book sits square to the page: the in-plane rotate(5deg) lean and
@@ -3324,6 +3404,17 @@ body.is-docked .book-wrap.is-closed .book:not(:hover):not(:focus-visible):not(.i
       return stickerInk('happy.svg', 17.5025, 17.3666, 'entry-sticker', tilt);
     }
 
+    /*
+     * Ink: always the colour saved with the note — the pen the visitor wrote
+     * with. Notes from before the pens were given a pen colour once, in the
+     * saved data (scripts/migrate-guestbook-inks.mjs), so nothing is picked
+     * at draw time. Anything that is not one of the pens draws in black.
+     */
+    function inkFor(entry) {
+      var vibe = (entry && entry.vibe) || {};
+      return penForInk(vibe.color) ? vibe.color : PEN_INKS[0].ink;
+    }
+
     function createScatterNote(entry) {
       var note = document.createElement('div');
       note.className = 'scatter-note';
@@ -3335,8 +3426,7 @@ body.is-docked .book-wrap.is-closed .book:not(:hover):not(:focus-visible):not(.i
       if (vibe.left) note.style.left = vibe.left;
       note.style.transform = 'rotate(' + rotation + 'deg)';
       note.style.fontFamily = "'Ugly Dave', cursive, sans-serif";
-      /* Only pen inks are honoured; older notes stored random grays. */
-      note.style.color = penForInk(vibe.color) ? vibe.color : '#1C1C1C';
+      note.style.color = inkFor(entry);
       var displayName =
         entry.name && entry.name !== '—' ? entry.name : 'Anonymous';
       var metaParts = [escapeHtml(displayName)];
@@ -3601,7 +3691,7 @@ body.is-docked .book-wrap.is-closed .book:not(:hover):not(:focus-visible):not(.i
         message: draft.message,
         name: draft.name,
         date: draft.date,
-        vibe: { rotation: draft.rotation, color: draft.color }
+        vibe: { rotation: draft.rotation, color: draft.color, pen: true }
       });
       list.appendChild(note);
       var size = NP.measureUnrotatedSize(note);
@@ -3631,6 +3721,7 @@ body.is-docked .book-wrap.is-closed .book:not(:hover):not(:focus-visible):not(.i
         vibe: {
           font: 'Ugly Dave',
           color: draft.color,
+          pen: true,
           rotation: placed.placement.rotation,
           weight: 400,
           fontSize: 14,
@@ -3666,7 +3757,7 @@ body.is-docked .book-wrap.is-closed .book:not(:hover):not(:focus-visible):not(.i
         message: draft.message,
         name: draft.name,
         date: draft.date,
-        vibe: { rotation: draft.rotation, color: draft.color }
+        vibe: { rotation: draft.rotation, color: draft.color, pen: true }
       });
       list.appendChild(note);
 
@@ -3679,6 +3770,7 @@ body.is-docked .book-wrap.is-closed .book:not(:hover):not(:focus-visible):not(.i
         vibe: {
           font: 'Ugly Dave',
           color: draft.color,
+          pen: true,
           rotation: draft.rotation,
           weight: 400,
           fontSize: 14,
@@ -3936,6 +4028,10 @@ body.is-docked .book-wrap.is-closed .book:not(:hover):not(:focus-visible):not(.i
      * body[data-pen-ui] decides how ink is picked; the menu in the lower left
      * switches it. All of them share currentPen / selectPen(). */
     var PEN_UI_STORAGE_KEY = 'guestbook_pen_ui';
+    /* The shipped ink picker. While set, every visitor gets it and the
+       lower-left switcher stays hidden; set to null to bring the switcher
+       (and the other variants) back for comparing. */
+    var SHIPPED_PEN_UI = 'bar';
     var PEN_UIS = [
       { id: 'rack', name: 'Rack', note: 'Pens peek in from the right edge' },
       { id: 'tile', name: 'Swatches', note: 'Hover the pen beside the field' },
@@ -3944,6 +4040,7 @@ body.is-docked .book-wrap.is-closed .book:not(:hover):not(:focus-visible):not(.i
       { id: 'v5', name: 'Option 5', note: 'Coming soon', soon: true }
     ];
     var penUi = (function () {
+      if (SHIPPED_PEN_UI) return SHIPPED_PEN_UI;
       try {
         var saved = localStorage.getItem(PEN_UI_STORAGE_KEY);
         for (var i = 0; i < PEN_UIS.length; i++) {
@@ -4266,6 +4363,7 @@ body.is-docked .book-wrap.is-closed .book:not(:hover):not(:focus-visible):not(.i
     }
 
     function setPenUiMenuVisible(on) {
+      if (SHIPPED_PEN_UI) on = false;
       penUiMenu.classList.toggle('is-visible', on);
       penUiMenu.setAttribute('aria-hidden', on ? 'false' : 'true');
       penUiTrigger.tabIndex = on ? 0 : -1;
@@ -5322,7 +5420,7 @@ body.is-docked .book-wrap.is-closed .book:not(:hover):not(:focus-visible):not(.i
       var slot = messageDock.querySelector('.message-dock-slot');
       var smallScreen = window.matchMedia('(pointer: coarse), (max-width: 1199.98px)');
       var PAD = 10;        // gap to the keyboard and to the top of the screen
-      var GAP = 12;        // gap between the book and the message field
+      var GAP = 12;        // book-to-field gap, if the resting layout has none
       var KEYBOARD_MIN = 120;
       var raf = 0;
       var active = false;
@@ -5362,7 +5460,10 @@ body.is-docked .book-wrap.is-closed .book:not(:hover):not(:focus-visible):not(.i
         // above them.
         var trayH = 0;
         if (penRack.classList.contains('is-visible') && penRack.classList.contains('is-bottom')) {
-          penRack.style.bottom = Math.max(0, hostWin.innerHeight - visBottom).toFixed(1) + 'px';
+          // `bottom` is measured from the frame's own viewport, not the host
+          // window's: the two differ on iOS, and using the host's parked the
+          // tray behind the keyboard.
+          penRack.style.bottom = Math.max(0, window.innerHeight - visBottom).toFixed(1) + 'px';
           trayH = penRack.offsetWidth; // turned a quarter: its width is its height
         } else {
           penRack.style.bottom = '';
@@ -5375,12 +5476,22 @@ body.is-docked .book-wrap.is-closed .book:not(:hover):not(:focus-visible):not(.i
         var fieldTop = visBottom - PAD - fieldH - (trayH ? trayH + 2 : 0);
         slot.style.translate = '0 ' + (fieldTop - slotTop).toFixed(1) + 'px';
 
-        // Book: as large as fits between the top and the field, centred there.
+        // Book: rides up with the field, keeping the same gap above it as when
+        // the keyboard is down (read from the untransformed layout), and only
+        // shrinks when that would push it under the close button. The button
+        // is fixed to the layout viewport's top, so it only needs clearing
+        // while it is still on screen.
         var stH = stageEl.offsetHeight;
         var stTop = layoutTop(stageEl);
-        var room = fieldTop - GAP - (visTop + PAD);
+        var restGap = slotTop - (stTop + stH);
+        var gap = restGap > 0 ? restGap : GAP;
+        var top = visTop + PAD;
+        if (bookCloseBtn && bookCloseBtn.classList.contains('is-visible')) {
+          top = Math.max(top, bookCloseBtn.getBoundingClientRect().bottom + PAD);
+        }
+        var room = fieldTop - gap - top;
         var k = Math.max(0.3, Math.min(1, room / stH));
-        var wantTop = visTop + PAD + Math.max(0, (room - stH * k) / 2);
+        var wantTop = fieldTop - gap - stH * k;
         var dy = wantTop - (stTop + stH * (1 - k) / 2); // scale is about the centre
         stageEl.style.scale = k.toFixed(3);
         stageEl.style.translate = '0 ' + dy.toFixed(1) + 'px';

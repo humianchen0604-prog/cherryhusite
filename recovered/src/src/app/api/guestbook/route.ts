@@ -31,6 +31,9 @@ type Entry = {
   vibe: {
     font: string; color: string; rotation: number;
     weight: number; fontSize: number; top: string; left: string;
+    /** `color` is a saved pen colour: the visitor's own pick, or the one
+     *  given once to notes from before the pens. Locks the colour (see PUT). */
+    pen?: true;
   };
   source: string;
 };
@@ -107,6 +110,7 @@ function sanitizeEntry(input: unknown): Entry | null {
       fontSize: 14,
       top: String(vibe.top || '12%').slice(0, 16),
       left: String(vibe.left || '12%').slice(0, 16),
+      ...(vibe.pen === true ? { pen: true as const } : {}),
     },
     source: 'book-cover',
   };
@@ -187,6 +191,14 @@ export async function PUT(req: Request) {
       if (!checkProfanity(entry.message, entry.name).ok) continue;
       // Position sync may update vibe coords; keep existing message/name if the
       // incoming payload somehow lost them (sanitize already requires message).
+      // Once a note has a pen colour it keeps it: a position sync from a
+      // browser holding an older copy of the note cannot write its old colour
+      // (or drop the flag) back over it.
+      const prev = byId.get(entry.id);
+      if (prev?.vibe?.pen) {
+        entry.vibe.pen = true;
+        entry.vibe.color = prev.vibe.color;
+      }
       byId.set(entry.id, entry);
     }
 

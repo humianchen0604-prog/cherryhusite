@@ -1531,6 +1531,44 @@ html:has(.hero-cloud) {
   z-index: 2147483000;
 }
 
+/*
+ * Touch screens: the blur behind the open book is painted here, on the host,
+ * instead of by the frost inside the frame (which switches its own blur off
+ * on touch). The frame stops at the edge of the visible viewport, so on iOS
+ * Safari its frost left an unblurred white strip under the browser's toolbar.
+ * This layer overshoots every edge, so the blur runs under the toolbar and
+ * the keyboard too. Same blur and the same enter/exit curves as the frost.
+ */
+@media (pointer: coarse) {
+  .guestbook_layer::before {
+    content: '';
+    position: fixed;
+    top: -50vh;
+    bottom: -50vh;
+    left: -32px;
+    right: -32px;
+    pointer-events: none;
+    -webkit-backdrop-filter: blur(40px) saturate(1.1);
+    backdrop-filter: blur(40px) saturate(1.1);
+    opacity: 0;
+    visibility: hidden;
+    transition:
+      opacity 300ms cubic-bezier(0.23, 1, 0.32, 1),
+      visibility 0s linear 300ms;
+  }
+  .guestbook_layer[data-open='true']::before {
+    opacity: 1;
+    visibility: visible;
+    transition:
+      opacity 420ms cubic-bezier(0.32, 0.72, 0, 1),
+      visibility 0s;
+  }
+}
+@media (pointer: coarse) and (prefers-reduced-motion: reduce) {
+  .guestbook_layer::before,
+  .guestbook_layer[data-open='true']::before { transition: none; }
+}
+
 .guestbook_backdrop {
   position: absolute;
   inset: 0;
@@ -4724,6 +4762,19 @@ body:has(.casestudy-root) .top-blur {
   opacity: 1;
 }
 
+/* Night mode in the menu: the same type size as the rows above it (the
+   theme toggle's own 12px is sized for the desktop corner), with the moon
+   scaled in step from its 11.7px-beside-12px ratio. */
+.mobile-menu__group--theme .theme-toggle__label {
+  font-size: calc(1rem * 0.86 * var(--text-scale, 1));
+  line-height: 1.4;
+}
+
+.mobile-menu__group--theme .theme-toggle__icon {
+  width: calc(1rem * 0.86 * 0.975 * var(--text-scale, 1));
+  height: calc(1rem * 0.86 * 0.975 * var(--text-scale, 1));
+}
+
 
 /* --- Experiences on tablet / mobile --------------------------------------
  * The preview panel is hover-driven, which has no equivalent on touch, so the
@@ -4843,13 +4894,20 @@ body:has(.casestudy-root) .top-blur {
 
   .footer_socials {
     top: auto;
-    bottom: 8px; /* nudged 10px lower */
+    bottom: 28px; /* 8px, then lifted 20px clear of the bottom edge */
   }
 
   /* 50.16px reads as oversized once the band is this narrow. */
   .footer_icon {
     width: 34px;
     height: 34px;
+  }
+}
+
+/* Phone: the résumé sticker 1.1x the tablet size (74.8px). */
+@media (max-width: 640px) {
+  .footer_resume {
+    width: 82.28px;
   }
 }
 

@@ -24,7 +24,7 @@ import { setGuestbookOpen } from '@/lib/guestbookOpen';
  * and tells the book when it is docked.
  */
 
-const BOOK_SRC = '/guestbook/book-cover.html?v=20261012-kb-default2';
+const BOOK_SRC = '/guestbook/book-cover.html?v=20261012-name-size';
 const MSG = 'guestbook-book';
 const FIRST_PAGE_TOAST_ID = 'guestbook-edge-page';
 const FIRST_PAGE_TOAST_MS = 1200;
@@ -535,7 +535,10 @@ export default function GuestbookBook() {
           left: 0,
           top: 0,
           width: '100vw',
-          height: '100vh',
+          // The fixed layer's height, not 100vh. On iOS 100vh is the height
+          // with the browser toolbars hidden, so the open book was centred too
+          // low and the pens at the frame's bottom edge sat off screen.
+          height: '100%',
           opacity: ready ? 1 : 0,
           // Full-viewport but inert while the book is flying home.
           pointerEvents: settling ? 'none' : 'auto',

@@ -19,6 +19,7 @@ const LINKS = [
   { label: 'LinkedIn', href: 'https://www.linkedin.com/in/cherryhu0604' },
   { label: 'Resume', href: RESUME_URL },
   { label: 'Email', href: 'mailto:bycherr1hu@gmail.com' },
+  { label: 'X/Twitter', href: 'https://x.com/bycherr1hu' },
 ];
 
 export default function MobileMenu() {
